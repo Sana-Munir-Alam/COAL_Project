@@ -25,7 +25,8 @@ INCLUDE Irvine32.inc
                   BYTE "2. Subtraction", 0Dh, 0Ah
                   BYTE "3. Multiplication", 0Dh, 0Ah
                   BYTE "4. Division", 0Dh, 0Ah
-                  BYTE "Enter choice (1-4): ", 0
+                  BYTE "5. Return to Main Menu", 0Dh, 0Ah
+                  BYTE "Enter your choice (1-5): ", 0
     enterFirst    BYTE "Enter first number: ", 0
     enterSecond   BYTE "Enter second number: ", 0
     calcResult    BYTE "Result: ", 0
@@ -39,7 +40,8 @@ INCLUDE Irvine32.inc
                   BYTE "2. String Concatenation", 0Dh, 0Ah
                   BYTE "3. Copy String", 0Dh, 0Ah
                   BYTE "4. Compare Strings", 0Dh, 0Ah
-                  BYTE "Enter choice (1-4): ", 0
+                  BYTE "5. Return to Main Menu", 0Dh, 0Ah
+                  BYTE "Enter your choice (1-5): ", 0
                   
     stringPrompt1 BYTE "Enter first string: ", 0
     stringPrompt2 BYTE "Enter second string: ", 0
@@ -103,8 +105,6 @@ main PROC
     
 main ENDP
 
-
-
 ; Display welcome message
 DisplayWelcomeMessage PROC
     mov edx, OFFSET welcomeMsg
@@ -142,141 +142,191 @@ ExecuteChoice PROC
     call WriteString
     ret
     
-CalculatorSection:
-    call CalculatorModule
-    ret
+    CalculatorSection:
+        call CalculatorModule
+        ret
     
-StringSection:
-    call StringModule
-    ret
+    StringSection:
+        call StringModule
+        ret
     
-MemorySection:
-    call MemoryModule
-    ret
+    MemorySection:
+        call MemoryModule
+        ret
     
-ExitProgram:
-    INVOKE ExitProcess, 0
+    ExitProgram:
+        INVOKE ExitProcess, 0
 ExecuteChoice ENDP
 
-; ==================== CALCULATOR MODULE ====================
+
+
+
+
+
+
+;; ==================== CALCULATOR MODULE ====================
+; Main procedure for arithmetic operation
+; Handles Addition, Subtraction, Multiplication, Division
+; ============================================================
 CalculatorModule PROC
-    mov edx, OFFSET calcTitle
-    call WriteString
-    call Crlf
-    
-    ; Display calculator operations menu
-    mov edx, OFFSET calcMenu
-    call WriteString
-    call ReadInt            ; Read operation choice
-    mov ebx, eax            ; Store choice in EBX
-    
-    ; Get first number from user
-    ; Get second number from user
-    
-    ; Perform operation based on choice in EBX(compare input value with 1,2,3,4 and jump to respective label if equal)
-    
-    ; If invalid operation choice, default to addition
-    jmp Addition
-    
+    ; Main menu loop for calculator operations
+    CalcMenuLoop:
+        call DisplayCalcMenu      ; Display calculator menu options to user
+        call ReadInt              ; Read user's menu choice as integer
+        call Crlf                 ; Print New Line
+        
+        ; Compare user input with menu options and jump to appropriate handler
+        cmp eax, 1                ; Check if user selected option 1
+        je Addition               ; Jump to Addition handler
+        cmp eax, 2                ; Check if user selected option 2  
+        je Subtraction            ; Jump to Subtraction handler
+        cmp eax, 3                ; Check if user selected option 3
+        je Multiplication         ; Jump to Multiplication handler
+        cmp eax, 4                ; Check if user selected option 4
+        je Division               ; Jump to Division handler
+        cmp eax, 5                ; Check if user selected option 5
+        je CalcEnd                ; Jump to Exit handler
+        
+        ; ========== INVALID INPUT HANDLER ==========
+        ; Display error message for invalid menu selection
+        mov edx, OFFSET invalidChoiceMsg  ; Load address of error message
+        call WriteString                  ; Display the error message
+
+        jmp CalcMenuLoop                  ; Return to menu to allow user to try again
+
+    ; ========== MENU OPTION HANDLERS ==========
     Addition:
-        jmp CalcEnd
-    
+        call AdditionProcedure       ; Call procedure to perform addition
+        jmp CalcMenuLoop             ; Return to main menu after completion
+
     Subtraction:
-        jmp CalcEnd
-    
+        call SubtractionProcedure    ; Call procedure to perform subtraction
+        jmp CalcMenuLoop             ; Return to main menu after completion
+
     Multiplication:
-        jmp CalcEnd
-    
+        call MultiplicationProcedure ; Call procedure to perform multiplication
+        jmp CalcMenuLoop             ; Return to main menu after completion
+
     Division:
-        ; Check for division by zero (if false perform division, if true, print error )
-    
+        call DivisionProcedure       ; Call procedure to perform division
+        jmp CalcMenuLoop             ; Return to main menu after completion
 
-        jmp CalcEnd
-    
-    PerformDivision:
-        call DisplayDivisionResult
-    
-    CalcEnd:
-        call Crlf
-        ret
-    CalculatorModule ENDP
+    CalcEnd:                         ; ========== EXIT HANDLER ==========
+        ret                          ; Return from CalculatorModule procedure
 
-    ; Display regular result (for Add, Sub, Mul)
-    DisplayResult PROC
-    
-        ret
-    DisplayResult ENDP
+CalculatorModule ENDP
 
-    ; Display division result (quotient and remainder)
-    DisplayDivisionResult PROC
+; =============================================
+; Display Calculator Menu
+; =============================================
+DisplayCalcMenu PROC
+    mov edx, OFFSET calcTitle        ; Load address of calculator title string
+    call WriteString                 ; Display the calculator title
+    call Crlf                        ; Output new line
     
-        ret
-DisplayDivisionResult ENDP
+    mov edx, OFFSET calcMenu         ; Load address of calculator menu string
+    call WriteString                 ; Display the menu options
+    
+    ret                              ; Return from procedure
+DisplayCalcMenu ENDP
 
-; ==================== STRING MODULE ====================
+; =============================================
+; Calculator Procedure
+; =============================================
+AdditionProcedure PROC
+    ret
+AdditionProcedure ENDP
+
+SubtractionProcedure PROC
+    ret
+SubtractionProcedure ENDP
+
+MultiplicationProcedure PROC
+    ret
+MultiplicationProcedure ENDP
+
+DivisionProcedure PROC
+    ret
+DivisionProcedure ENDP
+
+
+
+
+
+
+;; ==================== STRING MANIPULATION MODULE ====================
+; Main procedure for string manipulation operation
+; Handles string reverse, concatination, copy, and compare
+; ============================================================
+
 StringModule PROC
-    mov edx, OFFSET stringTitle
-    call WriteString
-    call Crlf
-    
-    ; Display string operations menu
-    mov edx, OFFSET stringMenu
-    call WriteString
-    call ReadInt
-    mov ebx, eax           ; Store choice in EBX
-    
-    ; Perform operation based on choice in EBX(compare input value with 1,2,3,4 and jump to respective label if equal)
-    
-    
-    ; Default to string reverse
-    jmp StringReverse
+    ; Main menu loop for string operations
+    StringMenuLoop:
+        call DisplayStringMenu     ; Display string operations menu to user
+        call ReadInt               ; Read user's menu choice as integer
+        call Crlf                  ; Print New Line
+        
+        ; Compare user input with menu options and jump to appropriate handler
+        cmp eax, 1                 ; Check if user selected option 1
+        je StringReverse           ; Jump to String Reverse handler
+        cmp eax, 2                 ; Check if user selected option 2  
+        je StringConcatenation     ; Jump to String Concatenation handler
+        cmp eax, 3                 ; Check if user selected option 3
+        je StringCopy              ; Jump to String Copy handler
+        cmp eax, 4                 ; Check if user selected option 4
+        je StringCompare           ; Jump to String Compare handler
+        cmp eax, 5                 ; Check if user selected option 5
+        je StringEnd               ; Jump to Exit handler
+        
+        ; ========== INVALID INPUT HANDLER ==========
+        ; Display error message for invalid menu selection
+        mov edx, OFFSET invalidChoiceMsg  ; Load address of error message
+        call WriteString                  ; Display the error message
+
+        jmp StringMenuLoop                ; Return to menu to allow user to try again
+
+    ; ========== MENU OPTION HANDLERS ==========
     
     StringReverse:
-        ; Get string input from user
-        ; Display original string
-        ; Reverse the string
-        ; Display reversed string
+        call StringReverseProcedure       ; Call procedure to reverse string
+        jmp StringMenuLoop                ; Return to main menu after completion
 
-
-        jmp StringEnd
-    
     StringConcatenation:
-        ; Get first string
-        ; Get second string
-        ; Concatenate strings
-        ; Display result
+        call StringConcatenationProcedure ; Call procedure to concatenate strings
+        jmp StringMenuLoop                ; Return to main menu after completion
 
-        jmp StringEnd
-    
     StringCopy:
-        ; Get string to copy
-        ; Copy string
-        ; Display success message
-        ; Display original
-        ; Display copy
+        call StringCopyProcedure          ; Call procedure to copy string
+        jmp StringMenuLoop                ; Return to main menu after completion
 
-        jmp StringEnd
-    
     StringCompare:
-        ; Get first string
-        ; Get second string
-        ; Compare strings
-        ; Display result
+        call StringCompareProcedure       ; Call procedure to compare strings
+        jmp StringMenuLoop                ; Return to main menu after completion
 
-        jmp StringEnd
-    
-    StringsNotEqual:
-        mov edx, OFFSET compareNotEqual
-        call WriteString
-    
-    StringEnd:
-        call Crlf
-        ret
+    StringEnd:                            ; ========== EXIT HANDLER ==========
+        ret                               ; Return from StringModule procedure
 
 StringModule ENDP
 
-; String reversal function
-ReverseString PROC
+; =============================================
+; Display String Menu
+; =============================================
+DisplayStringMenu PROC
+    mov edx, OFFSET stringTitle    ; Load address of string title string
+    call WriteString               ; Display the string title
+    call Crlf                      ; Output new line
+    
+    mov edx, OFFSET stringMenu     ; Load address of string menu string
+    call WriteString               ; Display the menu options
+    
+    ret                            ; Return from procedure
+DisplayStringMenu ENDP
+
+; =============================================
+; String Operation Procedures
+; =============================================
+
+StringReverseProcedure PROC
     ; ESI points to the string to reverse
     ; TODO: Implement string reversal logic here
     ; Steps:
@@ -286,10 +336,9 @@ ReverseString PROC
     
     ; For now, just return without modifying the string
     ret
-ReverseString ENDP
+StringReverseProcedure ENDP
 
-; String concatenation function
-ConcatenateStrings PROC
+StringConcatenationProcedure PROC
     ; ESI = first string, EDI = second string
     ; TODO: Implement string comparison logic here
     ; Steps:
@@ -300,10 +349,9 @@ ConcatenateStrings PROC
 
     ; For now, just return without modifying the string
     ret
-ConcatenateStrings ENDP
+StringConcatenationProcedure ENDP
 
-; String copy function
-CopyString PROC
+StringCopyProcedure PROC
     ; ESI = source string, EDI = destination buffer
     ; TODO: Implement string copy logic here
     ; Steps:
@@ -316,10 +364,9 @@ CopyString PROC
     
     ; For now, just return without modifying the string
     ret
-CopyString ENDP
+StringCopyProcedure ENDP
 
-; String comparison function
-CompareStrings PROC
+StringCompareProcedure PROC
     ; ESI = first string, EDI = second string
     ; TODO: Implement string concatenation logic here
     ; Steps:
@@ -329,14 +376,17 @@ CompareStrings PROC
 
     ; For now, just return without modifying the string
     ret
-CompareStrings ENDP
+StringCompareProcedure ENDP
+
+
+
 
 
 
 ;; ==================== MEMORY MANAGEMENT MODULE ====================
 ; Main procedure for memory management operations
 ; Handles matrix creation, display, addition, and memory management
-; =================================================================
+; ===================================================================
 
 MemoryModule PROC
     ; Main menu loop for memory management operations
