@@ -32,6 +32,9 @@ INCLUDE Irvine32.inc
     calcResult    BYTE "Result: ", 0
     divByZeroMsg  BYTE "Error: Division by zero!", 0Dh, 0Ah, 0
     remainderMsg  BYTE " Remainder: ", 0
+    usePrevResult BYTE "Use previous result as first number? (1=Yes, 0=No): ", 0
+    newCalcPrompt BYTE "Perform new calculation? (1=Yes, 0=No/Exit): ", 0
+
     
     ; String section  
     stringTitle   BYTE "===== String Operations Module =====", 0Dh, 0Ah, 0
@@ -86,6 +89,13 @@ INCLUDE Irvine32.inc
     matrixC          DWORD 0    ; Pointer to result matrix
     matrixSize       DWORD 0    ; Size of matrix (n)
     matrixAllocated  BYTE 0     ; Flag: 1 if memory allocated, 0 if not
+
+     ; Calculator variables
+    prevResult    DWORD 0          ; Store previous result
+    usePrev       DWORD 0          ; Flag to use previous result
+    firstNum      DWORD 0          ; First operand
+    secondNum     DWORD 0          ; Second operand
+    remainder     DWORD 0          ; Remainder 
 
 .code
 main PROC
@@ -161,14 +171,15 @@ ExecuteChoice ENDP
 
 
 
-
-
-
 ;; ==================== CALCULATOR MODULE ====================
 ; Main procedure for arithmetic operation
 ; Handles Addition, Subtraction, Multiplication, Division
 ; ============================================================
+
 CalculatorModule PROC
+    ; Initialize previous result to 0
+    mov prevResult, 0
+    
     ; Main menu loop for calculator operations
     CalcMenuLoop:
         call DisplayCalcMenu      ; Display calculator menu options to user
@@ -191,26 +202,33 @@ CalculatorModule PROC
         ; Display error message for invalid menu selection
         mov edx, OFFSET invalidChoiceMsg  ; Load address of error message
         call WriteString                  ; Display the error message
-
         jmp CalcMenuLoop                  ; Return to menu to allow user to try again
 
     ; ========== MENU OPTION HANDLERS ==========
     Addition:
         call AdditionProcedure       ; Call procedure to perform addition
-        jmp CalcMenuLoop             ; Return to main menu after completion
-
+        jmp AskForNewCalculation     ; Ask if user wants new calculation
+    
     Subtraction:
         call SubtractionProcedure    ; Call procedure to perform subtraction
-        jmp CalcMenuLoop             ; Return to main menu after completion
-
+        jmp AskForNewCalculation     ; Ask if user wants new calculation
+    
     Multiplication:
         call MultiplicationProcedure ; Call procedure to perform multiplication
-        jmp CalcMenuLoop             ; Return to main menu after completion
-
+        jmp AskForNewCalculation     ; Ask if user wants new calculation
+    
     Division:
         call DivisionProcedure       ; Call procedure to perform division
-        jmp CalcMenuLoop             ; Return to main menu after completion
+        jmp AskForNewCalculation     ; Ask if user wants new calculation
 
+    AskForNewCalculation:
+        call Crlf
+        mov edx, OFFSET newCalcPrompt
+        call WriteString
+        call ReadInt
+        cmp eax, 1
+        je CalcMenuLoop             ; Continue with new calculation
+        
     CalcEnd:                         ; ========== EXIT HANDLER ==========
         ret                          ; Return from CalculatorModule procedure
 
@@ -220,35 +238,172 @@ CalculatorModule ENDP
 ; Display Calculator Menu
 ; =============================================
 DisplayCalcMenu PROC
-    mov edx, OFFSET calcTitle        ; Load address of calculator title string
-    call WriteString                 ; Display the calculator title
-    call Crlf                        ; Output new line
+    call Clrscr                    ; Clear screen for fresh calculator interface
+    mov edx, OFFSET calcTitle      ; Load address of calculator title string
+    call WriteString               ; Display the calculator title
+    call Crlf                      ; Output new line
     
-    mov edx, OFFSET calcMenu         ; Load address of calculator menu string
-    call WriteString                 ; Display the menu options
+    ; Display previous result if available
+    cmp prevResult, 0
+    je NoPrevResult
+    mov edx, OFFSET calcResult
+    call WriteString
+    mov eax, prevResult
+    call WriteInt
+    call Crlf
+    call Crlf
+NoPrevResult:
     
-    ret                              ; Return from procedure
+    mov edx, OFFSET calcMenu       ; Load address of calculator menu string
+    call WriteString               ; Display the menu options
+    
+    ret                            ; Return from procedure
 DisplayCalcMenu ENDP
 
 ; =============================================
-; Calculator Procedure
+; Get Input Numbers Procedure
+; =============================================
+GetInputNumbers PROC
+    ; Ask if user wants to use previous result
+    cmp prevResult, 0
+    je GetFirstNumber              ; No previous result available
+    
+    mov edx, OFFSET usePrevResult
+    call WriteString
+    call ReadInt
+    mov usePrev, eax
+    
+    cmp usePrev, 1
+    jne GetFirstNumber
+    
+    ; Use previous result as first number
+    mov eax, prevResult
+    mov firstNum, eax
+    jmp GetSecondNumber
+
+GetFirstNumber:
+    mov edx, OFFSET enterFirst
+    call WriteString
+    call ReadInt
+    mov firstNum, eax
+
+GetSecondNumber:
+    mov edx, OFFSET enterSecond
+    call WriteString
+    call ReadInt
+    mov secondNum, eax
+    
+    ret
+GetInputNumbers ENDP
+
+; =============================================
+; Addition Procedure
 ; =============================================
 AdditionProcedure PROC
+    call GetInputNumbers          ; Get both numbers from user
+    
+    ; Perform addition
+    mov eax, firstNum
+    add eax, secondNum
+    mov prevResult, eax           ; Store result for potential future use
+    
+    ; Display result
+    mov edx, OFFSET calcResult
+    call WriteString
+    call WriteInt
+    call Crlf
+    
     ret
 AdditionProcedure ENDP
 
+; =============================================
+; Subtraction Procedure
+; =============================================
 SubtractionProcedure PROC
+    call GetInputNumbers          ; Get both numbers from user
+    
+    ; Perform subtraction
+    mov eax, firstNum
+    sub eax, secondNum
+    mov prevResult, eax           ; Store result for potential future use
+    
+    ; Display result
+    mov edx, OFFSET calcResult
+    call WriteString
+    call WriteInt
+    call Crlf
+    
     ret
 SubtractionProcedure ENDP
 
+; =============================================
+; Multiplication Procedure
+; =============================================
 MultiplicationProcedure PROC
+    call GetInputNumbers          ; Get both numbers from user
+    
+    ; Perform multiplication
+    mov eax, firstNum
+    imul eax, secondNum           ; Signed multiplication
+    mov prevResult, eax           ; Store result for potential future use
+    
+    ; Display result
+    mov edx, OFFSET calcResult
+    call WriteString
+    call WriteInt
+    call Crlf
+    
     ret
 MultiplicationProcedure ENDP
 
+; =============================================
+; Division Procedure
+; =============================================
 DivisionProcedure PROC
+    call GetInputNumbers          ; Get both numbers from user
+    
+    ; Check for division by zero
+    cmp secondNum, 0
+    jne PerformDivision
+    
+    ; Division by zero error
+    mov edx, OFFSET divByZeroMsg
+    call WriteString
+    ret
+
+PerformDivision:
+    ; Prepare for division
+    mov eax, firstNum
+    cdq                          ; Convert doubleword to quadword (sign extend EAX into EDX:EAX) 
+    mov ebx, secondNum           ; Move divisor to EBX
+    idiv ebx                     ; Signed division: EDX:EAX / EBX
+    
+    ; Store quotient as previous result
+    mov prevResult, eax
+    
+    ; Save remainder before it gets overwritten
+    mov remainder, edx                     ; Save remainder on stack
+    
+    ; Display quotient
+    mov edx, OFFSET calcResult
+    call WriteString
+    mov eax, prevResult
+    call WriteInt
+    
+    ; Check and display remainder
+    mov eax, remainder
+    cmp eax, 0
+    je DivisionComplete         ; if remainder is 0, no need to continue with the result
+    
+    ; Display remainder
+    mov edx, OFFSET remainderMsg
+    call WriteString
+    call WriteInt
+
+DivisionComplete:
+    call Crlf
     ret
 DivisionProcedure ENDP
-
 
 
 
