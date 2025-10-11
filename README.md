@@ -11,12 +11,6 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
   - Call Stack for function calls
   - Data Stack for operations
 
-- **Memory Management**
-  - Virtual memory allocation and deallocation
-  - Matrix memory management (A, B, C matrices)
-  - Memory read/write operations
-  - Address calculation for matrix elements
-
 - **Instruction Set Architecture (ISA) Used need it in our own language**
   - Arithmetic: ADD, SUB, IMUL, IDIV, MOV
   - Memory: ALLOC, FREE, STORE, LOAD
@@ -38,6 +32,12 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
   - Multiplication procedure implementation
   - Division procedure implementatio
   - With option to reuse previous result value
+
+- **Memory Management**
+  - Virtual memory allocation and deallocation
+  - Matrix memory management (A, B, C matrices)
+  - Memory read/write operations
+  - Address calculation for matrix elements
 
 - **Matrix Operations Module**
   - Dynamic matrix allocation
