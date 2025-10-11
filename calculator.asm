@@ -7,14 +7,12 @@ INCLUDE Irvine32.inc
 
 .data
     ; Menu and UI strings
-    welcomeMsg    BYTE "=== Virtual Machine with Memory Management ===", 0Dh, 0Ah, 0
+    welcomeMsg    BYTE "=== Virtual Machine with Calculator Operation ===", 0Dh, 0Ah, 0
     menuPrompt    BYTE "Please select an option:", 0Dh, 0Ah
                   BYTE "1. Calculator", 0Dh, 0Ah
-                  BYTE "2. String Operations", 0Dh, 0Ah
-                  BYTE "3. Memory Management", 0Dh, 0Ah
-                  BYTE "4. Exit Program", 0Dh, 0Ah
+                  BYTE "2. Exit Program", 0Dh, 0Ah
                   BYTE "Enter your choice (1-4): ", 0
-    invalidChoice BYTE "Invalid choice! Please enter 1-4.", 0Dh, 0Ah, 0
+    invalidChoice BYTE "Invalid choice! Please enter 1-2.", 0Dh, 0Ah, 0
     continueMsg   BYTE "Press any key to continue...", 0Dh, 0Ah, 0
     
     ; Calculator section
@@ -86,10 +84,6 @@ ExecuteChoice PROC
     cmp eax, 1
     je CalculatorSection
     cmp eax, 2
-    je StringSection
-    cmp eax, 3
-    je MemorySection
-    cmp eax, 4
     je ExitProgram
     
     ; Invalid choice
@@ -99,14 +93,6 @@ ExecuteChoice PROC
     
     CalculatorSection:
         call CalculatorModule
-        ret
-    
-    StringSection:
-        ;call StringModule
-        ret
-    
-    MemorySection:
-        ;call MemoryModule
         ret
     
     ExitProgram:
