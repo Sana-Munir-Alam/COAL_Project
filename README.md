@@ -30,7 +30,7 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
   - Addition procedure implementation
   - Subtraction procedure implementation  
   - Multiplication procedure implementation
-  - Division procedure implementatio
+  - Division procedure implementation
   - With option to reuse previous result value
 
 - **Memory Management**
@@ -55,6 +55,6 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
 ## Project Structure File
 - AssemblyCode.asm : Holds the original assembly code
 - VirtualEmulator.cpp : Holds the original emulator code
-- Virtual_Emulator_GrpPrototype.cpp : Asimple prototype to get an idea on how the program will flow<br>
+- Virtual_Emulator_GrpPrototype.cpp : A simple prototype to get an idea on how the program will flow<br>
 - Folder (Assembly Code): Holds the individual code of calculator, and memory .asm files.
 - Folder (Emulator Codes): Holds the individual code of calculator, and memory .cpp files.
