@@ -18,34 +18,34 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
   - Address calculation for matrix elements
 
 - **Instruction Set Architecture (ISA) Used need it in our own language**
-  - Arithmetic: ADD, SUB, MOV
-  - Memory: LOAD, STORE, ALLOC, FREE
-  - Control Flow: JMP, JE, JNE, JL, JLE, CALL, RET
+  - Arithmetic: ADD, SUB, IMUL, IDIV, MOV
+  - Memory: ALLOC, FREE, STORE, LOAD
+  - Control Flow: CMP, JMP, JE, JNE, JL, JLE, CALL, RET
   - I/O: PRINT_STR, READ_INT, WRITE_INT, READ_CHAR
   - Matrix Operations: MATRIX_ALLOC_MEM, INPUT_MATRIX_A/B, MATRIX_ADD_OPERATION
-  - System: CLRSC, HALT
+  - System: CLRSC, HALT, CDQ
 
 - **User Interface Modules**
   - Main menu system with modular navigation
-  - Calculator module framework
+  - Calculator module framework (fully implemented)
   - String operations module framework
   - Memory management module (fully implemented)
   - Proper module switching (option 5 returns to main menu)
 
-- **Matrix Operations**
+- **Calculator Operations Module**
+  - Addition procedure implementation
+  - Subtraction procedure implementation  
+  - Multiplication procedure implementation
+  - Division procedure implementatio
+  - With option to reuse previous result value
+
+- **Matrix Operations Module**
   - Dynamic matrix allocation
   - Matrix input/output
   - Matrix addition
   - Memory-efficient storage using base addresses
 
 ### Remaining Implementation
-
-- **Calculator Module**
-  - Addition procedure implementation
-  - Subtraction procedure implementation  
-  - Multiplication procedure implementation
-  - Division procedure implementation
-
 - **String Operations Module**
   - String reverse procedure
   - String concatenation procedure
@@ -56,3 +56,5 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
 - AssemblyCode.asm : Holds the original assembly code
 - VirtualEmulator.cpp : Holds the original emulator code
 - Virtual_Emulator_GrpPrototype.cpp : Asimple prototype to get an idea on how the program will flow<br>
+- Folder (Assembly Code): Holds the individual code of calculator, and memory .asm files.
+- Folder (Emulator Codes): Holds the individual code of calculator, and memory .cpp files.
