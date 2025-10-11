@@ -12,12 +12,14 @@ using namespace std;          // Use standard namespace to avoid std:: prefix
 
 class VirtualMachine {
     private:
+
         unordered_map<string, int> registers;           // Storage for CPU registers (name-value pairs)
         unordered_map<string, string> stringMemory;     // Storage for named string constants
         vector<string> programMemory;                   // Stores program instructions as strings
         unordered_map<string, int> labels;              // Maps label names to instruction addresses
         int programCounter;                             // Tracks current instruction position [EIP equivalent]
         bool running;                                   // VM execution state (true=running, false=stopped)
+        
         bool ZF, SF, OF, CF;                            // Status flags: Zero, Sign, Overflow, Carry
         stack<int> callStack;                           // Stores return addresses for CALL/RET instructions
         stack<int> dataStack;                           // General purpose stack for data operations
@@ -26,6 +28,7 @@ class VirtualMachine {
         unordered_map<string, int> matrixPointers;      // Stores matrix names and base memory addresses
         int matrixSize;                                 // Size dimension for allocated matrices
         bool matrixAllocated;                           // Tracks if matrix memory is currently allocated
+        
         int firstNum, secondNum, remainder, prevResult; // Calculator variables
         bool usePrev;                                   // Flag to use previous result
                
@@ -44,16 +47,17 @@ class VirtualMachine {
             matrixAllocated = false;                     // Set matrix allocated flag to false
             InitializeStringMemory();                    // Call method to set up predefined string constants
             
+            // Memory Initialiser
             matrixPointers["matrixA"] = 0;               // Initialize matrixA pointer to 0 (unallocated)
             matrixPointers["matrixB"] = 0;               // Initialize matrixB pointer to 0 (unallocated)
             matrixPointers["matrixC"] = 0;               // Initialize matrixC pointer to 0 (unallocated)
 
             // Initialize calculator variables
-            prevResult = 0;
-            usePrev = false;
-            firstNum = 0;
-            secondNum = 0;
-            remainder = 0;
+            prevResult = 0;                              // Store previous result
+            usePrev = false;                             // Flag to use previous result
+            firstNum = 0;                                // First operand
+            secondNum = 0;                               // Second operand
+            remainder = 0;                               // Remainder 
         }
         
         void InitializeStringMemory() {                  // Method to set up predefined string messages
@@ -390,7 +394,7 @@ class VirtualMachine {
             }
 
             // ========== I/O OPERATIONS ==========
-             if (opcode == "PRINT_STR") {                       // Print string from string memory
+            else if (opcode == "PRINT_STR") {                       // Print string from string memory
                 if (tokens.size() > 1 && stringMemory.find(tokens[1]) != stringMemory.end()) {
                     cout << stringMemory[tokens[1]];                // Output predefined string
                 }
