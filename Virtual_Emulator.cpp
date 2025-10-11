@@ -12,21 +12,23 @@ using namespace std;          // Use standard namespace to avoid std:: prefix
 
 class VirtualMachine {
     private:
-        unordered_map<string, int> registers;        // Storage for CPU registers (name-value pairs)
-        unordered_map<string, string> stringMemory;  // Storage for named string constants
-        vector<string> programMemory;                // Stores program instructions as strings
-        unordered_map<string, int> labels;           // Maps label names to instruction addresses
-        int programCounter;                          // Tracks current instruction position [EIP equivalent]
-        bool running;                                // VM execution state (true=running, false=stopped)
-        bool ZF, SF, OF, CF;                         // Status flags: Zero, Sign, Overflow, Carry
-        stack<int> callStack;                        // Stores return addresses for CALL/RET instructions
-        stack<int> dataStack;                        // General purpose stack for data operations
-        unordered_map<int, int> virtualMemory;       // Simulates memory address space (address-value pairs)
-        int nextMemoryAddress = 0x1000;              // Next available memory address (starts at 0x1000)
-        unordered_map<string, int> matrixPointers;   // Stores matrix names and base memory addresses
-        int matrixSize;                              // Size dimension for allocated matrices
-        bool matrixAllocated;                        // Tracks if matrix memory is currently allocated
-
+        unordered_map<string, int> registers;           // Storage for CPU registers (name-value pairs)
+        unordered_map<string, string> stringMemory;     // Storage for named string constants
+        vector<string> programMemory;                   // Stores program instructions as strings
+        unordered_map<string, int> labels;              // Maps label names to instruction addresses
+        int programCounter;                             // Tracks current instruction position [EIP equivalent]
+        bool running;                                   // VM execution state (true=running, false=stopped)
+        bool ZF, SF, OF, CF;                            // Status flags: Zero, Sign, Overflow, Carry
+        stack<int> callStack;                           // Stores return addresses for CALL/RET instructions
+        stack<int> dataStack;                           // General purpose stack for data operations
+        unordered_map<int, int> virtualMemory;          // Simulates memory address space (address-value pairs)
+        int nextMemoryAddress = 0x1000;                 // Next available memory address (starts at 0x1000)
+        unordered_map<string, int> matrixPointers;      // Stores matrix names and base memory addresses
+        int matrixSize;                                 // Size dimension for allocated matrices
+        bool matrixAllocated;                           // Tracks if matrix memory is currently allocated
+        int firstNum, secondNum, remainder, prevResult; // Calculator variables
+        bool usePrev;                                   // Flag to use previous result
+               
     public:
         VirtualMachine() {                               // Constructor - initializes virtual machine state
             for (int i = 0; i < 6; i++) {                // Loop to initialize 6 general purpose registers
@@ -45,6 +47,13 @@ class VirtualMachine {
             matrixPointers["matrixA"] = 0;               // Initialize matrixA pointer to 0 (unallocated)
             matrixPointers["matrixB"] = 0;               // Initialize matrixB pointer to 0 (unallocated)
             matrixPointers["matrixC"] = 0;               // Initialize matrixC pointer to 0 (unallocated)
+
+            // Initialize calculator variables
+            prevResult = 0;
+            usePrev = false;
+            firstNum = 0;
+            secondNum = 0;
+            remainder = 0;
         }
         
         void InitializeStringMemory() {                  // Method to set up predefined string messages
@@ -61,7 +70,9 @@ class VirtualMachine {
             stringMemory["calcResult"] = "Result: ";
             stringMemory["divByZeroMsg"] = "Error: Division by zero!\n";
             stringMemory["remainderMsg"] = " Remainder: ";
-
+            stringMemory["usePrevResult"] = "Use previous result as first number? (1=Yes, 0=No): ";
+            stringMemory["newCalcPrompt"] = "Perform new calculation? (1=Yes, 0=No/Exit): ";
+            
             // String section
             stringMemory["stringTitle"] = "===== String Operations Module =====\n";
             stringMemory["stringMenu"] = "Select string operation:\n1. String Reverse\n2. String Concatenation\n3. Copy String\n4. Compare Strings\n5. Return to Main Menu\nEnter your choice (1-5): ";
@@ -74,7 +85,7 @@ class VirtualMachine {
             stringMemory["copySuccess"] = "String successfully copied to new variable!\n";
             stringMemory["compareEqual"] = "Strings are EQUAL!\n";
             stringMemory["compareNotEqual"] = "Strings are NOT equal!\n";
-
+            
             // Memory management section
             stringMemory["memoryTitle"] = "===== Memory Management Module =====\n";
             stringMemory["memoryMenu"] = "1. Create Matrix\n2. Display Matrix\n3. Add Matrices\n4. Free Matrix Memory\n5. Return to Main Menu\nEnter your choice (1-5): ";
@@ -96,7 +107,7 @@ class VirtualMachine {
             stringMemory["inputBuffer"] = "";
             stringMemory["ClearCharacter"] = "Z";
         }
-        
+
         int AllocateVirtualMemory(int size) {            // Allocates contiguous block in virtual memory
             int address = nextMemoryAddress;             // Get next available memory address
             for (int i = 0; i < size; i++) {             // Loop through each element to allocate
@@ -224,7 +235,7 @@ class VirtualMachine {
             
             string opcode = tokens[0];                       // Extract instruction mnemonic (first token)
             bool incrementPC = true;                         // Default: move to next instruction after execution
-
+            
             // ========== MEMORY MANAGEMENT INSTRUCTIONS ==========
             if (opcode == "ALLOC") {                                // Allocate memory block instruction
                 if (tokens.size() > 2 && IsRegister(tokens[1]) && IsRegister(tokens[2])) {
@@ -379,7 +390,7 @@ class VirtualMachine {
             }
 
             // ========== I/O OPERATIONS ==========
-            else if (opcode == "PRINT_STR") {                       // Print string from string memory
+             if (opcode == "PRINT_STR") {                       // Print string from string memory
                 if (tokens.size() > 1 && stringMemory.find(tokens[1]) != stringMemory.end()) {
                     cout << stringMemory[tokens[1]];                // Output predefined string
                 }
@@ -408,77 +419,182 @@ class VirtualMachine {
                     cout << "  WRITE_INT " << tokens[1] << endl;
                     cout << registers[tokens[1]];                   // Print register value
                 }
-            }else if (opcode == "READ_CHAR") {                      // Read a single character from user
+            }
+            else if (opcode == "READ_CHAR") {                      // Read a single character from user
                 char c;
                 cin >> c;
             }
 
             // ========== ARITHMETIC INSTRUCTIONS ========== 
-            else if (opcode == "ADD") {                             // Add two registers
-                if (tokens.size() > 2 && IsRegister(tokens[1]) && IsRegister(tokens[2])) {
+            else if (opcode == "ADD") {                             // Add two registers or a variable into register
+                if (tokens.size() > 2 && IsRegister(tokens[1])) {
                     cout << "  ADD " << tokens[1] << ", " << tokens[2] << endl;
                     int oldValue = registers[tokens[1]];            // Store original value for overflow detection
-                    registers[tokens[1]] += registers[tokens[2]];   // Add source to destination register
-                    cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+                    int operand2;                                   // A var to store the second operand (register or var)
                     
+                    // Parse second operand (register, variable, or immediate)
+                    if (IsRegister(tokens[2])) { operand2 = registers[tokens[2]]; }               // operand 2 is a register
+                    else if (IsVariable(tokens[2])) { operand2 = GetVariableValue(tokens[2]);}    // operand 2 is a varaible
+                    else { operand2 = stoi(tokens[2]); }                                          // operaad 2 is a immediate value
+
+                    registers[tokens[1]] += operand2;   // Add source to destination register
+                    cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+                
                     // Set status flags for ADD operation
                     int result = registers[tokens[1]];
                     ZF = (result == 0);                                             // Zero Flag: result is zero
                     SF = (result < 0);                                              // Sign Flag: result is negative
-                    OF = (oldValue > 0 && registers[tokens[2]] > 0 && result < 0) ||// Positive overflow
-                        (oldValue < 0 && registers[tokens[2]] < 0 && result > 0);   // Negative overflow
-                    CF = false;                                                     // No carry flag for signed arithmetic ??
+                    OF = (oldValue > 0 && operand2 > 0 && result < 0) ||            // Positive overflow
+                        (oldValue < 0 && operand2 < 0 && result > 0);               // Negative overflow
+                    CF = false;                                                     // No carry flag for signed arithmetic
                     
                     cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
                 }
             }
-            else if (opcode == "SUB") {                             // Subtract two registers
-                // Check 1: Verify instruction has at least 3 tokens (opcode + 2 operands)      Check 2: Verify first operand (tokens[1]) is a valid register name       Check 3: Verify second operand (tokens[2]) is a valid register name
-                if (tokens.size() > 2 && IsRegister(tokens[1]) && IsRegister(tokens[2])) {      // Overall: Ensure instruction has proper "OP REGISTER, REGISTER" format
+            else if (opcode == "SUB") {                             // Subtract two registers or a var into register
+                if (tokens.size() > 2 && IsRegister(tokens[1])) {   // Overall: Ensure instruction has proper "OP REGISTER, REGISTER" format
                     cout << "  SUB " << tokens[1] << ", " << tokens[2] << endl;
                     int oldValue = registers[tokens[1]];            // Store original value for overflow detection
-                    registers[tokens[1]] -= registers[tokens[2]];   // Subtract source from destination
+                    int operand2;                                   // A var to store the second operand (register or var)
+                    
+                    // Parse second operand (register, variable, or immediate)
+                    if (IsRegister(tokens[2])) { operand2 = registers[tokens[2]]; }             // operand 2 is a register
+                    else if (IsVariable(tokens[2])) { operand2 = GetVariableValue(tokens[2]);}  // operand 2 is a variable
+                    else { operand2 = stoi(tokens[2]); }                                        // operand 2 is a immediate value
+                    
+                    registers[tokens[1]] -= operand2;   // Subtract source from destination
                     cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
                     
                     // Set status flags for SUB operation
                     int result = registers[tokens[1]];
                     ZF = (result == 0);                             // Zero Flag: result is zero
                     SF = (result < 0);                              // Sign Flag: result is negative
-                    OF = (oldValue >= 0 && registers[tokens[2]] < 0 && result < 0) || (oldValue < 0 && registers[tokens[2]] > 0 && result > 0); // Overflow cases
+                    OF = (oldValue >= 0 && operand2 < 0 && result < 0) || (oldValue < 0 && operand2 > 0 && result > 0); // Overflow cases
                     CF = false;                                     // No carry flag for signed arithmetic
                     cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
                 }
             }
-            else if (opcode == "MOV") {                             // Move value to register
-                if (tokens.size() > 2 && IsRegister(tokens[1])) {   // Check 1: Verify instruction has at least 3 tokens (opcode + 2 operands)      Check 2: Verify first operand (tokens[1]) is a valid register name
-                    cout << "  MOV " << tokens[1] << ", " << tokens[2] << endl;
-                    if (IsRegister(tokens[2])) { registers[tokens[1]] = registers[tokens[2]]; } // If the second token is also a Register than it's a Register-to-register move
-                    else { registers[tokens[1]] = stoi(tokens[2]); }                            // Immediate value to register
-                    cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+            else if (opcode == "IDIV") {
+                // Signed division: EDX:EAX / divisor
+                if (tokens.size() > 1) {
+                    cout << "  IDIV " << tokens[1] << endl;
+                    int divisor;
                     
-                    // MOV affects Zero and Sign flags
-                    int result = registers[tokens[1]];
-                    ZF = (result == 0);                      // Set Zero Flag
-                    SF = (result < 0);                       // Set Sign Flag
-                    cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << endl;
+                    // Parse divisor (register, variable, or immediate)
+                    if (IsRegister(tokens[1])) { divisor = registers[tokens[1]]; }              // divisor is a register
+                    else if (IsVariable(tokens[1])) { divisor = GetVariableValue(tokens[1]); }  // divisor is a variable
+                    else {  divisor = stoi(tokens[1]); }                                        // divisor is a immediate value
+                    
+                    if (divisor == 0) {
+                        cout << "  -> ERROR: Division by zero!" << endl;
+                        ZF = false; SF = false; OF = true; CF = true;
+                    } else {
+                        // Dividend is in R0:R1 (64-bit), result in R0, remainder in R1
+                        long long dividend = (long long)registers["R0"] | ((long long)registers["R1"] << 32);
+                        registers["R0"] = (int)(dividend / divisor);  // Quotient
+                        registers["R1"] = (int)(dividend % divisor);  // Remainder
+                        
+                        cout << "  -> R0 (quotient) = " << registers["R0"] << endl;
+                        cout << "  -> R1 (remainder) = " << registers["R1"] << endl;
+                        
+                        // Set flags for IDIV
+                        ZF = (registers["R0"] == 0);
+                        SF = (registers["R0"] < 0);
+                        OF = false;  // IDIV doesn't typically set overflow flag
+                        CF = false;  // IDIV doesn't typically set carry flag
+                        
+                        cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
+                    }
                 }
             }
-
+            else if (opcode == "IMUL") {
+                // Signed multiplication
+                if (tokens.size() > 2 && IsRegister(tokens[1])) {
+                    cout << "  IMUL " << tokens[1] << ", " << tokens[2] << endl;
+                    int operand2;
+                    
+                    // Parse second operand (register, variable, or immediate)
+                    if (IsRegister(tokens[2])) { operand2 = registers[tokens[2]]; } 
+                    else if (IsVariable(tokens[2])) { operand2 = GetVariableValue(tokens[2]);}
+                    else { operand2 = stoi(tokens[2]); }
+                    
+                    long long result = (long long)registers[tokens[1]] * (long long)operand2;
+                    registers[tokens[1]] = (int)result;              // Store lower 32 bits
+                    cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+                    
+                    // Set flags for IMUL
+                    ZF = (registers[tokens[1]] == 0);
+                    SF = (registers[tokens[1]] < 0);
+                    // For IMUL, OF and CF are set if the result exceeds 32-bit signed range
+                    OF = CF = (result > INT_MAX || result < INT_MIN);
+                    
+                    cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
+                }
+            }
+            else if (opcode == "MOV") {
+                if (tokens.size() > 2) {
+                    cout << "  MOV " << tokens[1] << ", " << tokens[2] << endl;
+                    
+                    // Handle MOV from register to calculator variables 
+                    if (IsRegister(tokens[1])) {
+                        if (IsRegister(tokens[2])) { 
+                            registers[tokens[1]] = registers[tokens[2]]; 
+                        } else if (IsVariable(tokens[2])) { 
+                            registers[tokens[1]] = GetVariableValue(tokens[2]); 
+                        } else { 
+                            registers[tokens[1]] = stoi(tokens[2]); 
+                        }
+                        cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+                        
+                        // MOV to register affects flags
+                        int result = registers[tokens[1]];
+                        ZF = (result == 0);                      // Set Zero Flag
+                        SF = (result < 0);                       // Set Sign Flag
+                        cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << endl;
+                    }
+                    // Handle MOV from calculator variables to registers (source is calculator variable)
+                    else if (IsVariable(tokens[1])) {
+                        int value;
+                        if (IsRegister(tokens[2])) {
+                            value = registers[tokens[2]];
+                        } else if (IsVariable(tokens[2])) {
+                            value = GetVariableValue(tokens[2]);
+                        } else {
+                            value = stoi(tokens[2]);
+                        }
+                        SetVariableValue(tokens[1], value);
+                        cout << "  -> " << tokens[1] << " = " << GetVariableValue(tokens[1]) << endl;
+                    }
+                }
+            }
+            
             // ========== COMPARISON AND BRANCHING ==========
             else if (opcode == "CMP") {                      // Compare two values
                 if (tokens.size() > 2) {                     // Check 1: Verify instruction has at least 3 tokens (opcode + 2 operands)
                     cout << "  CMP " << tokens[1] << ", " << tokens[2] << endl;
                     int val1, val2;                          // Values to compare
                     
-                    // Parse first operand (can be register, immediate, or special variable)
-                    if (tokens[1] == "matrixAllocated") { val1 = matrixAllocated ? 1 : 0; } // Special variable: matrix allocation flag
-                    else if (IsRegister(tokens[1])) { val1 = registers[tokens[1]]; }        // Register operand
-                    else { val1 = stoi(tokens[1]); }                                        // Immediate value
+                    // Parse first operand (can be register, immediate, special variable, or calculator variable)
+                    if (tokens[1] == "matrixAllocated") { 
+                        val1 = matrixAllocated ? 1 : 0; 
+                    } else if (IsRegister(tokens[1])) { 
+                        val1 = registers[tokens[1]]; 
+                    } else if (IsVariable(tokens[1])) {
+                        val1 = GetVariableValue(tokens[1]);
+                    } else { 
+                        val1 = stoi(tokens[1]); 
+                    }
                     
-                    // Parse second operand (can be register, immediate, or special variable)
-                    if (tokens[2] == "matrixAllocated") { val2 = matrixAllocated ? 1 : 0; } // Special variable: matrix allocation flag
-                    else if (IsRegister(tokens[2])) { val2 = registers[tokens[2]]; }        // Register operand
-                    else { val2 = stoi(tokens[2]); }                                        // Immediate value
+                    // Parse second operand (can be register, immediate, special variable, or calculator variable)
+                    if (tokens[2] == "matrixAllocated") { 
+                        val2 = matrixAllocated ? 1 : 0; 
+                    } else if (IsRegister(tokens[2])) { 
+                        val2 = registers[tokens[2]]; 
+                    } else if (IsVariable(tokens[2])) {
+                        val2 = GetVariableValue(tokens[2]);
+                    } else { 
+                        val2 = stoi(tokens[2]); 
+                    }
                     
                     int result = val1 - val2;                                               // Compute comparison result
                     // Set status flags based on comparison
@@ -572,6 +688,16 @@ class VirtualMachine {
                 running = false;                             // Set VM running flag to false
                 cout << "  -> Program halted." << endl;      // Display halt message
             }
+            else if (opcode == "CDQ") {
+                // Convert Doubleword to Quadword (sign extend EAX into EDX:EAX)
+                // In our simple VM, we'll simulate this for division
+                if (registers["R0"] < 0) {
+                    registers["R1"] = -1; // R3 is EDX equivalent (all bits 1 for negative)
+                } else {
+                    registers["R1"] = 0;  // R3 is EDX equivalent (all bits 0 for positive)
+                }
+                cout << "  -> CDQ: (R0:R1) EDX:EAX prepared for division" << endl;
+            }
             return incrementPC;                              // Return whether to increment program counter
         }
         
@@ -617,6 +743,25 @@ class VirtualMachine {
             matrixAllocated = false;                         // Set allocation flag to false
         }
 
+        // Helper function to get variable value
+        int GetVariableValue(const string& varName) {
+            if (varName == "prevResult") return prevResult;
+            if (varName == "firstNum") return firstNum;
+            if (varName == "secondNum") return secondNum;
+            if (varName == "remainder") return remainder;
+            if (varName == "usePrev") return usePrev ? 1 : 0;
+            return 0; // default
+        }
+        
+        // Helper function to set variable value
+        void SetVariableValue(const string& varName, int value) {
+            if (varName == "prevResult") prevResult = value;
+            else if (varName == "firstNum") firstNum = value;
+            else if (varName == "secondNum") secondNum = value;
+            else if (varName == "remainder") remainder = value;
+            else if (varName == "usePrev") usePrev = (value != 0);
+        }
+        
         vector<string> Tokenize(const string& line) {        // Split instruction line into individual tokens
             vector<string> tokens;                           // Vector to store resulting tokens
             stringstream ss(line);                           // Create string stream from input line
@@ -627,10 +772,15 @@ class VirtualMachine {
             }
             return tokens;                                   // Return vector of tokens
         }
-
+        
         bool IsRegister(const string& token) {               // Check if token represents a valid register name
             // First character must be 'R'     Token must be exactly 2 characters long      Second character must be a digit (0-5)
             return token[0] == 'R' && token.size() == 2 && isdigit(token[1]);                           
+        }
+        
+        // Helper function to check if a token is a variable name
+        bool IsVariable(const string& token) {
+            return token == "prevResult" || token == "firstNum" || token == "secondNum" || token == "remainder" || token == "usePrev";  // Your specific variable names
         }
 };
 
@@ -699,10 +849,6 @@ int main() {
         testFile << "    CALL CalculatorModule\n";
         testFile << "    RET\n";
         testFile << "\n";
-        testFile << "StringSection:\n";
-        testFile << "    CALL StringModule\n";
-        testFile << "    RET\n";
-        testFile << "\n";
         testFile << "MemorySection:\n";
         testFile << "    CALL MemoryModule\n";
         testFile << "    RET\n";
@@ -733,19 +879,25 @@ int main() {
         testFile << "\n";
         testFile << "Addition:\n";
         testFile << "    CALL AdditionProcedure\n";
-        testFile << "    JMP CalcMenuLoop\n";
+        testFile << "    JMP AskForNewCalculation\n";
         testFile << "\n";
         testFile << "Subtraction:\n";
         testFile << "    CALL SubtractionProcedure\n";
-        testFile << "    JMP CalcMenuLoop\n";
+        testFile << "    JMP AskForNewCalculation\n";
         testFile << "\n";
         testFile << "Multiplication:\n";
         testFile << "    CALL MultiplicationProcedure\n";
-        testFile << "    JMP CalcMenuLoop\n";
+        testFile << "    JMP AskForNewCalculation\n";
         testFile << "\n";
         testFile << "Division:\n";
         testFile << "    CALL DivisionProcedure\n";
-        testFile << "    JMP CalcMenuLoop\n";
+        testFile << "    JMP AskForNewCalculation\n";
+        testFile << "\n";
+        testFile << "AskForNewCalculation:\n";
+        testFile << "    PRINT_STR newCalcPrompt\n";
+        testFile << "    CALL ReadUserChoice\n";
+        testFile << "    CMP R0, 1\n";
+        testFile << "    JE CalcMenuLoop\n";
         testFile << "\n";
         testFile << "CalcEnd:\n";
         testFile << "    RET\n";
@@ -754,23 +906,101 @@ int main() {
         // Calculator sub-procedures
         testFile << "DisplayCalcMenu:\n";
         testFile << "    PRINT_STR calcTitle\n";
+        testFile << "    CMP prevResult, 0\n";
+        testFile << "    JE NoPrevResult\n";
+        testFile << "    PRINT_STR calcResult\n";
+        testFile << "    MOV R0, prevResult\n";
+        testFile << "    WRITE_INT R0\n";
+        testFile << "NoPrevResult:\n";
         testFile << "    PRINT_STR calcMenu\n";
         testFile << "    RET\n";
         testFile << "\n";
-        testFile << "AdditionProcedure:\n";
-        testFile << "    RET\n";
+
+        testFile << "GetInputNumbers:\n";
+        testFile << "    CMP prevResult, 0\n";
+        testFile << "    JE getFirstNumber\n";
+        testFile << "    PRINT_STR usePrevResult\n";
+        testFile << "    CALL ReadUserChoice\n";
+        testFile << "    MOV usePrev, R0\n";
+        testFile << "    CMP usePrev, 1\n";
+        testFile << "    JNE getFirstNumber\n";
+        testFile << "    MOV R0, prevResult\n";
+        testFile << "    MOV firstNum, R0\n";
+        testFile << "    JMP getsecondNumber\n";
         testFile << "\n";
-        testFile << "SubtractionProcedure:\n";
-        testFile << "    RET\n";
+        testFile << "getFirstNumber:\n";
+        testFile << "    PRINT_STR enterFirst\n";
+        testFile << "    CALL ReadUserChoice\n";
+        testFile << "    MOV firstNum, R0\n";
         testFile << "\n";
-        testFile << "MultiplicationProcedure:\n";
-        testFile << "    RET\n";
-        testFile << "\n";
-        testFile << "DivisionProcedure:\n";
+        testFile << "getsecondNumber:\n";
+        testFile << "    PRINT_STR enterSecond\n";
+        testFile << "    CALL ReadUserChoice\n";
+        testFile << "    MOV secondNum, R0\n";
         testFile << "    RET\n";
         testFile << "\n";
 
-        // String manipulation module
+        testFile << "AdditionProcedure:\n";
+        testFile << "    CALL GetInputNumbers\n";
+        testFile << "    MOV R0, firstNum\n";
+        testFile << "    ADD R0, secondNum\n";
+        testFile << "    MOV prevResult, R0\n";
+        testFile << "    PRINT_STR calcResult\n";
+        testFile << "    WRITE_INT R0\n";   // Display Result
+        testFile << "    RET\n";
+        testFile << "\n";
+
+        testFile << "SubtractionProcedure:\n";
+        testFile << "    CALL GetInputNumbers\n";
+        testFile << "    MOV R0, firstNum\n";
+        testFile << "    SUB R0, secondNum\n";
+        testFile << "    MOV prevResult, R0\n";
+        testFile << "    PRINT_STR calcResult\n";
+        testFile << "    WRITE_INT R0\n";   // Display Result
+        testFile << "    RET\n";
+        testFile << "\n";
+
+        testFile << "MultiplicationProcedure:\n";
+        testFile << "    CALL GetInputNumbers\n";
+        testFile << "    MOV R0, firstNum\n";
+        testFile << "    IMUL R0, secondNum\n";
+        testFile << "    MOV prevResult, R0\n";
+        testFile << "    PRINT_STR calcResult\n";
+        testFile << "    WRITE_INT R0\n";   // Display Result
+        testFile << "    RET\n";
+        testFile << "\n";
+
+        testFile << "DivisionProcedure:\n";
+        testFile << "    CALL GetInputNumbers\n";
+        testFile << "    CMP secondNum, 0\n";
+        testFile << "    JNE PerfromDivision\n";
+        testFile << "    PRINT_STR divByZeroMsg\n";
+        testFile << "    RET\n";
+        testFile << "\n";
+
+        testFile << "PerfromDivision:\n";
+        testFile << "    CMP secondNum, 0\n";
+        testFile << "    MOV R0, firstNum\n";
+        testFile << "    CDQ\n";
+        testFile << "    MOV R1, secondNum\n";
+        testFile << "    IDIV R1\n";
+        testFile << "    MOV prevResult, R0\n";
+        testFile << "    MOV remainder, R1\n";
+        testFile << "    PRINT_STR calcResult\n";
+        testFile << "    WRITE_INT R0\n";   // Display Result
+        testFile << "    MOV R0, remainder\n";
+        testFile << "    CMP R0, 0\n";
+        testFile << "    JE DivisionComplete\n";
+        testFile << "\n";
+        testFile << "DivisionComplete:\n";
+        testFile << "    PRINT_STR remainderMsg\n";
+         testFile << "   WRITE_INT R0\n";   // Display Remainder Result
+        testFile << "    RET\n";
+        testFile << "\n";
+
+        
+
+         // String manipulation module
         testFile << "; ========== STRING MANIPULATION MODULE ==========\n";
         testFile << "StringModule:\n";
         testFile << "StringMenuLoop:\n";
@@ -830,7 +1060,7 @@ int main() {
         testFile << "StringCompareProcedure:\n";
         testFile << "    RET\n";
         testFile << "\n";
-
+        
         // memory management module
         testFile << "; ========== MEMORY MANAGEMENT MODULE ==========\n";
         testFile << "MemoryModule:\n";
@@ -907,8 +1137,9 @@ int main() {
         testFile << "    FREE_ALL_MATRICES\n";
         testFile << "NoCleanupNeeded:\n";
         testFile << "    RET\n";
-    testFile.close();
     
+    testFile.close();
+        
     vm.LoadProgram("memory_program.asm");
     vm.run();
     
