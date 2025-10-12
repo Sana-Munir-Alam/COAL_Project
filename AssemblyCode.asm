@@ -1,7 +1,7 @@
 .386
 .model flat, stdcall
 .stack 4096
-ExitProcess PROTO, dwExitCode:DWORD     ; Written so that terminal doesnt close unless we tell it so
+ExitProcess PROTO, dwExitCode:DWORD
 
 
 INCLUDE Irvine32.inc
@@ -46,18 +46,17 @@ INCLUDE Irvine32.inc
                   BYTE "5. Return to Main Menu", 0Dh, 0Ah
                   BYTE "Enter your choice (1-5): ", 0
                   
-    stringPrompt1 BYTE "Enter first string: ", 0
-    stringPrompt2 BYTE "Enter second string: ", 0
-    originalStr   BYTE "Original string: ", 0
+    msg1 BYTE "Enter first string: ", 0
+    msg2 BYTE "Enter second string: ", 0
     reversedStr   BYTE "Reversed string: ", 0
     concatResult  BYTE "Concatenated string: ", 0
     copyResult    BYTE "Copied string: ", 0
-    copySuccess   BYTE "String successfully copied to new variable!", 0Dh, 0Ah, 0
     compareEqual  BYTE "Strings are EQUAL!", 0Dh, 0Ah, 0
     compareNotEqual BYTE "Strings are NOT equal!", 0Dh, 0Ah, 0
-    inputBuffer   BYTE 50 DUP(0)      ; Buffer for string input
-    inputBuffer2  BYTE 50 DUP(0)      ; Second buffer for string operations
-    copyBuffer    BYTE 50 DUP(0)      ; Buffer for copied string
+
+    str1     BYTE 100 DUP(?)        ; buffer for first string
+    str2     BYTE 100 DUP(?)        ; buffer for second string
+    result   BYTE 200 DUP(?)        ; large buffer for concatenation result
     
     ; Memory management section
     menuTitle        BYTE "===== Memory Management Module =====", 0Dh, 0Ah, 0
@@ -408,58 +407,56 @@ DivisionProcedure ENDP
 
 
 
-
 ;; ==================== STRING MANIPULATION MODULE ====================
 ; Main procedure for string manipulation operation
-; Handles string reverse, concatination, copy, and compare
-; ============================================================
+; Handles string reverse, concatenation, copy, and compare
+; ===================================================================
 
 StringModule PROC
     ; Main menu loop for string operations
     StringMenuLoop:
-        call DisplayStringMenu     ; Display string operations menu to user
-        call ReadInt               ; Read user's menu choice as integer
-        call Crlf                  ; Print New Line
+        call DisplayStringMenu         ; Display string operations menu to user
+        call ReadInt                   ; Read user's menu choice as integer
+        call Crlf                      ; Print New Line
         
         ; Compare user input with menu options and jump to appropriate handler
-        cmp eax, 1                 ; Check if user selected option 1
-        je StringReverse           ; Jump to String Reverse handler
-        cmp eax, 2                 ; Check if user selected option 2  
-        je StringConcatenation     ; Jump to String Concatenation handler
-        cmp eax, 3                 ; Check if user selected option 3
-        je StringCopy              ; Jump to String Copy handler
-        cmp eax, 4                 ; Check if user selected option 4
-        je StringCompare           ; Jump to String Compare handler
-        cmp eax, 5                 ; Check if user selected option 5
-        je StringEnd               ; Jump to Exit handler
+        cmp eax, 1                     ; Check if user selected option 1
+        je StringReverseOp             ; Jump to String Reverse handler
+        cmp eax, 2                     ; Check if user selected option 2
+        je StringConcatenationOp       ; Jump to String Concatenation handler
+        cmp eax, 3                     ; Check if user selected option 3
+        je StringCopyOp                ; Jump to String Copy handler
+        cmp eax, 4                     ; Check if user selected option 4
+        je StringCompareOp             ; Jump to String Compare handler
+        cmp eax, 5                     ; Check if user selected option 5
+        je StringEnd                   ; Jump to Exit handler
         
         ; ========== INVALID INPUT HANDLER ==========
         ; Display error message for invalid menu selection
         mov edx, OFFSET invalidChoiceMsg  ; Load address of error message
         call WriteString                  ; Display the error message
-
         jmp StringMenuLoop                ; Return to menu to allow user to try again
 
     ; ========== MENU OPTION HANDLERS ==========
     
-    StringReverse:
-        call StringReverseProcedure       ; Call procedure to reverse string
-        jmp StringMenuLoop                ; Return to main menu after completion
+    StringReverseOp:
+        call ReverseStringProcedure         ; Call procedure to reverse string
+        jmp StringMenuLoop                  ; Return to main menu after completion
 
-    StringConcatenation:
-        call StringConcatenationProcedure ; Call procedure to concatenate strings
-        jmp StringMenuLoop                ; Return to main menu after completion
+    StringConcatenationOp:
+        call ConcatenateStringsProcedure    ; Call procedure to concatenate strings
+        jmp StringMenuLoop                  ; Return to main menu after completion
 
-    StringCopy:
-        call StringCopyProcedure          ; Call procedure to copy string
-        jmp StringMenuLoop                ; Return to main menu after completion
+    StringCopyOp:
+        call CopyStringProcedure            ; Call procedure to copy string
+        jmp StringMenuLoop                  ; Return to main menu after completion
 
-    StringCompare:
-        call StringCompareProcedure       ; Call procedure to compare strings
-        jmp StringMenuLoop                ; Return to main menu after completion
+    StringCompareOp:
+        call CompareStringsProcedure        ; Call procedure to compare strings
+        jmp StringMenuLoop                  ; Return to main menu after completion
 
-    StringEnd:                            ; ========== EXIT HANDLER ==========
-        ret                               ; Return from StringModule procedure
+    StringEnd:                             ; ========== EXIT HANDLER ==========
+        ret                                ; Return from StringModule procedure
 
 StringModule ENDP
 
@@ -467,6 +464,7 @@ StringModule ENDP
 ; Display String Menu
 ; =============================================
 DisplayStringMenu PROC
+    call Clrscr                    ; Clear screen for fresh string interface
     mov edx, OFFSET stringTitle    ; Load address of string title string
     call WriteString               ; Display the string title
     call Crlf                      ; Output new line
@@ -478,62 +476,239 @@ DisplayStringMenu PROC
 DisplayStringMenu ENDP
 
 ; =============================================
-; String Operation Procedures
+; Reverse String Procedure
+; =============================================
+ReverseStringProcedure PROC
+    mov edx, OFFSET msg1
+    call WriteString               ; Prompt user for string
+    mov edx, OFFSET str1
+    mov ecx, SIZEOF str1
+    call ReadString                ; Read string into str1
+
+    mov esi, OFFSET str1
+    call StrLength                 ; Irvine32: returns string length in EAX
+    mov ecx, eax                   ; Store length in ECX (loop counter)
+    mov esi, OFFSET str1
+    add esi, ecx                   ; Move ESI to end of string
+    dec esi                        ; Point to last valid char
+    mov edi, OFFSET result         ; Destination for reversed string
+
+    RevLoop:
+        movzx eax, BYTE PTR [esi]  ; Move character into EAX (zero-extended)
+        mov BYTE PTR [edi], al     ; Store in result
+        dec esi                    ; Move backward in source
+        inc edi                    ; Move forward in destination
+        loop RevLoop               ; Repeat for each character
+
+    mov BYTE PTR [edi], 0          ; Null-terminate reversed string
+
+    mov edx, OFFSET reversedStr
+    call WriteString
+    mov edx, OFFSET result
+    call WriteString               ; Display reversed string
+    call Crlf
+    call PauseForInput             ; Wait for key press
+    ret
+ReverseStringProcedure ENDP
+
+; =============================================
+; Concatenate Strings Procedure
+; =============================================
+ConcatenateStringsProcedure PROC
+    mov edx, OFFSET msg1
+    call WriteString
+    mov edx, OFFSET str1
+    mov ecx, SIZEOF str1
+    call ReadString                ; Get first string
+
+    mov edx, OFFSET msg2
+    call WriteString
+    mov edx, OFFSET str2
+    mov ecx, SIZEOF str2
+    call ReadString                ; Get second string
+
+    ; Copy str1 into result
+    push OFFSET result             ; dest
+    push OFFSET str1               ; src
+    call MyStrCopy
+
+    ; Append str2 to result
+    push OFFSET result             ; dest (append to)
+    push OFFSET str2               ; src
+    call MyStrCat
+
+    mov edx, OFFSET concatResult
+    call WriteString
+    mov edx, OFFSET result
+    call WriteString               ; Show concatenated result
+    call Crlf
+    call PauseForInput
+    ret
+ConcatenateStringsProcedure ENDP
+
+; =============================================
+; Copy String Procedure
+; =============================================
+CopyStringProcedure PROC
+    mov edx, OFFSET msg1
+    call WriteString
+    mov edx, OFFSET str1
+    mov ecx, SIZEOF str1
+    call ReadString                ; Read string
+
+    push OFFSET result             ; dest
+    push OFFSET str1               ; src
+    call MyStrCopy                 ; Copy str1 -> result
+
+    mov edx, OFFSET copyResult
+    call WriteString
+    mov edx, OFFSET result
+    call WriteString               ; Print copied string
+    call Crlf
+    call PauseForInput
+    ret
+CopyStringProcedure ENDP
+
+; =============================================
+; Compare Strings Procedure
+; =============================================
+CompareStringsProcedure PROC
+    mov edx, OFFSET msg1
+    call WriteString
+    mov edx, OFFSET str1
+    mov ecx, SIZEOF str1
+    call ReadString                ; Read first string
+
+    mov edx, OFFSET msg2
+    call WriteString
+    mov edx, OFFSET str2
+    mov ecx, SIZEOF str2
+    call ReadString                ; Read second string
+
+    push OFFSET str2               ; Parameter 2
+    push OFFSET str1               ; Parameter 1
+    call MyStrCompare              ; Compare both
+
+    cmp eax, 0                     ; Result from MyStrCompare
+    jne NotEqual
+    mov edx, OFFSET compareEqual   ; Strings are equal
+    call WriteString
+    call Crlf
+    call PauseForInput
+    ret
+
+    NotEqual:
+        mov edx, OFFSET compareNotEqual  ; Strings not equal
+        call WriteString
+        call Crlf
+        call PauseForInput
+    ret
+CompareStringsProcedure ENDP
+
+; =============================================
+; Helper Procedure: Pause For Input
+; RENAMED from WaitMsg to avoid conflict with Irvine32 library
+; =============================================
+PauseForInput PROC
+    mov edx, OFFSET continueMsg
+    call WriteString
+    call ReadChar                  ; Wait for key press
+    ret
+PauseForInput ENDP
+
+; =============================================
+; Custom String Functions
 ; =============================================
 
-StringReverseProcedure PROC
-    ; ESI points to the string to reverse
-    ; TODO: Implement string reversal logic here
-    ; Steps:
-    ; 1. Find string length (scan for null terminator)
-    ; 2. Set up pointers: beginning and end of string
-    ; 3. Swap characters until pointers meet
+;-------------------------------------------------------------
+; MyStrCopy(dest, src)
+; Copies a string from src -> dest (including null terminator)
+; Parameters: [esp+8] = src, [esp+12] = dest
+;-------------------------------------------------------------
+MyStrCopy PROC
+    push ebp
+    mov ebp, esp
+    mov esi, [ebp+8]               ; Source string pointer
+    mov edi, [ebp+12]              ; Destination pointer
+
+    CopyLoop:
+        movzx eax, BYTE PTR [esi]  ; Read one byte into EAX
+        mov BYTE PTR [edi], al     ; Write to destination
+        inc esi                    ; Next source char
+        inc edi                    ; Next dest position
+        cmp al, 0                  ; End of string?
+        jne CopyLoop               ; If not, continue
+
+    pop ebp
+    ret 8                          ; Remove parameters
+MyStrCopy ENDP
+
+;-------------------------------------------------------------
+; MyStrCat(dest, src)
+; Appends src at the end of dest
+; Parameters: [esp+8] = src, [esp+12] = dest
+;-------------------------------------------------------------
+MyStrCat PROC
+    push ebp
+    mov ebp, esp
+    mov esi, [ebp+8]               ; src
+    mov edi, [ebp+12]              ; dest
+
+    FindEnd:
+        movzx eax, BYTE PTR [edi]  ; Find null terminator in dest
+        cmp al, 0
+        je CopyStart
+        inc edi
+        jmp FindEnd
+
+    CopyStart:
+        movzx eax, BYTE PTR [esi]  ; Copy from src -> dest
+        mov BYTE PTR [edi], al
+        inc esi
+        inc edi
+        cmp al, 0
+        jne CopyStart              ; Continue until null terminator
+
+    pop ebp
+    ret 8
+MyStrCat ENDP
+
+;-------------------------------------------------------------
+; MyStrCompare(s1, s2)
+; Compares two strings character by character
+; Parameters: [esp+8] = s1, [esp+12] = s2
+; Returns:
+;   EAX = 0 -> Equal
+;   EAX = 1 -> Not Equal
+;-------------------------------------------------------------
+MyStrCompare PROC
+    push ebp
+    mov ebp, esp
+    mov esi, [ebp+8]               ; String 1
+    mov edi, [ebp+12]              ; String 2
+
+    CompareLoop:
+        movzx eax, BYTE PTR [esi]  ; Read byte from s1
+        movzx ebx, BYTE PTR [edi]  ; Read byte from s2
+        cmp eax, ebx               ; Compare characters
+        jne NotEqualStrings        ; Mismatch -> not equal
+        cmp eax, 0                 ; Check for end of string
+        je EqualStrings            ; Both ended -> equal
+        inc esi
+        inc edi
+        jmp CompareLoop            ; Next characters
+
+    EqualStrings:
+        mov eax, 0                 ; Strings equal
+        jmp ComparisonDone
     
-    ; For now, just return without modifying the string
-    ret
-StringReverseProcedure ENDP
-
-StringConcatenationProcedure PROC
-    ; ESI = first string, EDI = second string
-    ; TODO: Implement string comparison logic here
-    ; Steps:
-    ; 1. Loop through both strings, comparing characters at each position
-    ; 2. If characters differ, return 1 (not equal)
-    ; 3. If null terminator is reached in both, return 0 (equal)
-    ; 4. If one string ends before the other, return 1 (not equal)
-
-    ; For now, just return without modifying the string
-    ret
-StringConcatenationProcedure ENDP
-
-StringCopyProcedure PROC
-    ; ESI = source string, EDI = destination buffer
-    ; TODO: Implement string copy logic here
-    ; Steps:
-    ; 1. Check that destination buffer is valid/writable
-    ; 2. Read a character from the source (ESI)
-    ; 3. Write it to the destination (EDI)
-    ; 4. Increment both pointers
-    ; 5. If character was null terminator, stop
-    ; 6. Otherwise, repeat from step 2
+    NotEqualStrings:
+        mov eax, 1                 ; Strings not equal
     
-    ; For now, just return without modifying the string
-    ret
-StringCopyProcedure ENDP
-
-StringCompareProcedure PROC
-    ; ESI = first string, EDI = second string
-    ; TODO: Implement string concatenation logic here
-    ; Steps:
-    ; 1. Find the null terminator of the first string (ESI)
-    ; 2. Copy the second string (EDI) starting at that position
-    ; 3. Ensure the final string is null-terminated
-
-    ; For now, just return without modifying the string
-    ret
-StringCompareProcedure ENDP
-
-
+    ComparisonDone:
+        pop ebp
+        ret 8
+MyStrCompare ENDP
 
 
 
@@ -615,7 +790,7 @@ DisplayMemoryMenu PROC
 DisplayMemoryMenu ENDP
 
 ; =============================================
-; Create Matrix Procedure - FIXED VERSION [Definately Final ONE]
+; Create Matrix Procedure
 ; =============================================
 CreateMatrixProcedure PROC
     ; Free existing matrices if any
@@ -785,34 +960,34 @@ DisplaySingleMatrix PROC
     mov ecx, matrixSize    ; Set outer loop counter for rows
     mov edi, 0             ; Initialize row index to 0
     
-display_RowLoop:
-    push ecx               ; Save outer loop counter
-    
-    ; Display row label
-    mov edx, OFFSET matrixDisplayRow    ; Load address of display prefix
-    call WriteString                    ; Display "Matrix "
-    mov eax, edi                        ; Load current row index
-    call WriteDec                       ; Display row number
-    mov edx, OFFSET matrixDisplayCol    ; Load address of column separator
-    call WriteString                    ; Display "]: "
-    
-    mov ecx, matrixSize                 ; Set inner loop counter for columns
-    
-    DisplayColLoop:
-        mov eax, [esi]                  ; Load current matrix element
-        call WriteInt                   ; Display the integer value
-        mov edx, OFFSET spaceChar       ; Load address of space character
-        call WriteString                ; Display space between elements
+    display_RowLoop:
+        push ecx               ; Save outer loop counter
         
-        add esi, 4                      ; Advance pointer to next DWORD element
-        loop DisplayColLoop             ; Continue inner loop for columns
-        call Crlf                       ; Output new line after each row
+        ; Display row label
+        mov edx, OFFSET matrixDisplayRow    ; Load address of display prefix
+        call WriteString                    ; Display "Matrix "
+        mov eax, edi                        ; Load current row index
+        call WriteDec                       ; Display row number
+        mov edx, OFFSET matrixDisplayCol    ; Load address of column separator
+        call WriteString                    ; Display "]: "
+        
+        mov ecx, matrixSize                 ; Set inner loop counter for columns
+        
+        DisplayColLoop:
+            mov eax, [esi]                  ; Load current matrix element
+            call WriteInt                   ; Display the integer value
+            mov edx, OFFSET spaceChar       ; Load address of space character
+            call WriteString                ; Display space between elements
+            
+            add esi, 4                      ; Advance pointer to next DWORD element
+            loop DisplayColLoop             ; Continue inner loop for columns
+            call Crlf                       ; Output new line after each row
 
-        inc edi                         ; Increment row index
-        pop ecx                         ; Restore outer loop counter
-        loop display_RowLoop            ; Continue outer loop for rows
+        inc edi                             ; Increment row index
+        pop ecx                             ; Restore outer loop counter
+        loop display_RowLoop                ; Continue outer loop for rows
     
-    ret                                 ; Return from procedure
+    ret                                     ; Return from procedure
 DisplaySingleMatrix ENDP
 
 ; =============================================
@@ -879,7 +1054,7 @@ FreeMemoryProcedure PROC
 FreeMemoryProcedure ENDP
 
 ; =============================================
-; Free All Matrices - FIXED VERSION
+; Free All Matrices
 ; =============================================
 FreeAllMatrices PROC
     ; Free matrix A
