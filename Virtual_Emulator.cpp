@@ -7,6 +7,7 @@
 #include <algorithm>          // Algorithms library (sort, find, transform)
 #include <stack>              // Stack container (Last-In-First-Out)
 #include <cstdlib>            // General utilities (memory, conversions, exit)
+#include <conio.h>            // General utilities (memory, conversions, exit)
 
 using namespace std;          // Use standard namespace to avoid std:: prefix
 
@@ -31,6 +32,10 @@ class VirtualMachine {
         
         int firstNum, secondNum, remainder, prevResult; // Calculator variables
         bool usePrev;                                   // Flag to use previous result
+        
+        // String buffers
+        unordered_map<string, int> stringBuffers;       // Maps buffer names to memory addresses
+        unordered_map<string, int> stringVariables;     // For DWORD variables (addresses, lengths)
                
     public:
         VirtualMachine() {                               // Constructor - initializes virtual machine state
@@ -57,14 +62,39 @@ class VirtualMachine {
             usePrev = false;                             // Flag to use previous result
             firstNum = 0;                                // First operand
             secondNum = 0;                               // Second operand
-            remainder = 0;                               // Remainder 
+            remainder = 0;                               // Remainder
+            
+            // Initialize string buffers (allocate memory addresses for them)
+            InitializeStringBuffers();
         }
         
-        void InitializeStringMemory() {                  // Method to set up predefined string messages
+        void InitializeStringBuffers() {
+            // Allocate memory for string buffers (100 bytes each, 200 for result)
+            stringBuffers["string1"] = AllocateVirtualMemory(100);           // 100 bytes
+            stringBuffers["string2"] = AllocateVirtualMemory(100);           // 100 bytes
+            stringBuffers["resultString"] = AllocateVirtualMemory(200);      // 200 bytes for concatenation
+            stringBuffers["reversedString"] = AllocateVirtualMemory(100);    // 100 bytes
+            stringBuffers["copiedString"] = AllocateVirtualMemory(100);      // 100 bytes
+            
+            // Initialize string variables (pointers and lengths)
+            stringVariables["string1Addr"] = 0;
+            stringVariables["string2Addr"] = 0;
+            stringVariables["string1Length"] = 0;
+            stringVariables["string2Length"] = 0;
+            
+            cout << "=== String Buffers Initialized ===" << endl;
+            cout << "string1 at address: 0x" << hex << stringBuffers["string1"] << dec << endl;
+            cout << "string2 at address: 0x" << hex << stringBuffers["string2"] << dec << endl;
+            cout << "resultString at address: 0x" << hex << stringBuffers["resultString"] << dec << endl;
+            cout << "reversedString at address: 0x" << hex << stringBuffers["reversedString"] << dec << endl;
+            cout << "copiedString at address: 0x" << hex << stringBuffers["copiedString"] << dec << endl;
+        }
+        
+        void InitializeStringMemory() {                                 // Method to set up predefined string messages
             stringMemory["welcomeMsg"] = "=== Virtual Machine with Memory Management ===\n";
             stringMemory["menuPrompt"] = "Please select an option:\n1. Calculator\n2. String Operations\n3. Memory Management\n4. Exit Program\nEnter your choice (1-4): ";
             stringMemory["invalidChoice"] = "Invalid choice! Please enter 1-4.\n";
-            stringMemory["continueMsg"] = "Press 'Z' key to continue...\n";
+            stringMemory["continueMsg"] = "Press any key to clear the screen...\n";
 
             // Calculator section
             stringMemory["calcTitle"] = "===== Calculator Module =====\n";
@@ -72,7 +102,6 @@ class VirtualMachine {
             stringMemory["enterFirst"] = "Enter first number: ";
             stringMemory["enterSecond"] = "Enter second number: ";
             stringMemory["calcResult"] = "Result: ";
-            stringMemory["divByZeroMsg"] = "Error: Division by zero!\n";
             stringMemory["remainderMsg"] = " Remainder: ";
             stringMemory["usePrevResult"] = "Use previous result as first number? (1=Yes, 0=No): ";
             stringMemory["newCalcPrompt"] = "Perform new calculation? (1=Yes, 0=No/Exit): ";
@@ -106,25 +135,27 @@ class VirtualMachine {
             stringMemory["matrixBLabel"] = "Matrix B:\n";
             
             // Error messages
+            stringMemory["divByZeroMsg"] = "Error: Division by zero!\n";
+            stringMemory["emptyStringMsg"] = "Error: Empty string detected!\n";
             stringMemory["noMatrixMsg"] = "Error: No matrix allocated. Please create matrix first.\n";
             stringMemory["invalidChoiceMsg"] = "Error: Invalid choice. Please try again.\n";
             stringMemory["inputBuffer"] = "";
             stringMemory["ClearCharacter"] = "Z";
         }
 
-        int AllocateVirtualMemory(int size) {            // Allocates contiguous block in virtual memory
-            int address = nextMemoryAddress;             // Get next available memory address
-            for (int i = 0; i < size; i++) {             // Loop through each element to allocate
-                virtualMemory[address + i * 4] = 0;      // Initialize memory location to zero (4-byte aligned)
+        int AllocateVirtualMemory(int size) {                           // Allocates contiguous block in virtual memory
+            int address = nextMemoryAddress;                        // Get next available memory address
+            for (int i = 0; i < size; i++) {                        // Loop through each element to allocate
+                virtualMemory[address + i] = 0;                     // Initialize memory location to zero (byte-aligned)
             }
-            nextMemoryAddress += size * 4;               // Update next available address (4 bytes per element)
-            cout << "  -> Allocated " << size << " elements at address 0x" << hex << address << dec << endl;
-            return address;                              // Return base address of allocated block
+            nextMemoryAddress += size;                              // Update next available address
+            cout << "  -> Allocated " << size << " bytes at address 0x" << hex << address << dec << endl;
+            return address;                                         // Return base address of allocated block
         }
 
         void FreeVirtualMemory(int address, int size) {                 // Deallocates memory block at given address
             for (int i = 0; i < size; i++) {                            // Loop through each element to free
-                virtualMemory.erase(address + i * 4);                   // Remove memory entry from virtualMemory map
+                virtualMemory.erase(address + i);                       // Remove memory entry from virtualMemory map
             }
             cout << "  -> Freed memory at address 0x" << hex << address << dec << endl;
         }
@@ -133,12 +164,40 @@ class VirtualMachine {
             if (virtualMemory.find(address) != virtualMemory.end()) {   // Check if address exists in memory
                 return virtualMemory[address];                          // Return value stored at memory address
             }
-            cout << "  -> ERROR: Memory read from invalid address 0x" << hex << address << dec << endl;
+            // cout << "  -> ERROR: Memory read from invalid address 0x" << hex << address << dec << endl;
             return 0;                                                   // Return 0 for invalid memory access
         }
 
         void WriteVirtualMemory(int address, int value) {               // Writes value to virtual memory address
             virtualMemory[address] = value;                             // Store value in virtualMemory map at address
+        }
+        
+        // Helper to write string to memory (byte by byte)
+        void WriteStringToMemory(int baseAddress, const string& str) {
+            for (size_t i = 0; i < str.length(); i++) {
+                WriteVirtualMemory(baseAddress + i, (int)(unsigned char)str[i]);
+            }
+            WriteVirtualMemory(baseAddress + str.length(), 0);  // Null terminator
+        }
+        
+        // Helper to read string from memory
+        string ReadStringFromMemory(int baseAddress, int maxLength = 200) {
+            string result = "";
+            for (int i = 0; i < maxLength; i++) {
+                int charValue = ReadVirtualMemory(baseAddress + i);
+                if (charValue == 0) break;  // Null terminator
+                result += (char)charValue;
+            }
+            return result;
+        }
+        
+        // Helper to get address of string buffer by name
+        int GetStringBufferAddress(const string& bufferName) {
+            if (stringBuffers.find(bufferName) != stringBuffers.end()) {
+                return stringBuffers[bufferName];
+            }
+            cout << "  -> ERROR: String buffer '" << bufferName << "' not found!" << endl;
+            return 0;
         }
 
         int GetMatrixElementAddress(int baseAddress, int row, int col, int size) {
@@ -233,15 +292,56 @@ class VirtualMachine {
             }
         }
         
-        bool executeInstruction(const string& instruction) { // Execute single instruction, return whether to increment PC
-            vector<string> tokens = Tokenize(instruction);   // Split instruction into opcode and operands
-            if (tokens.empty()) return true;                 // Return true for empty lines (increment PC)
+        bool executeInstruction(const string& instruction) {            // Execute single instruction, return whether to increment PC
+            vector<string> tokens = Tokenize(instruction);              // Split instruction into opcode and operands
+            if (tokens.empty()) return true;                            // Return true for empty lines (increment PC)
             
-            string opcode = tokens[0];                       // Extract instruction mnemonic (first token)
-            bool incrementPC = true;                         // Default: move to next instruction after execution
+            string opcode = tokens[0];                                  // Extract instruction mnemonic (first token)
+            bool incrementPC = true;                                    // Default: move to next instruction after execution
+            
+            // ========== STACK OPERATIONS ==========
+            if (opcode == "PUSH") {                                 // Check if instruction is PUSH
+                if (tokens.size() > 1) {                                // Verify that at least 2 tokens exist (PUSH, operand)
+                    // Remove colon if present (e.g., "PUSH R0:" -> "PUSH R0")
+                    string operand = tokens[1];                         // Extract the operand token
+                    if (operand.back() == ':') {                        // Check if colon is present at the end
+                        operand = operand.substr(0, operand.length() - 1); // Remove the trailing colon
+                    }
+                    
+                    int value;                                          // Declare variable to hold the value to push
+                    if (IsRegister(operand)) {                          // Check if operand is a register
+                        value = registers[operand];                     // Get value from the register
+                    } else if (IsVariable(operand)) {                   // Check if operand is a variable
+                        value = GetVariableValue(operand);              // Get value from the variable
+                    } else {                                            // Operand must be an immediate value
+                        value = stoi(operand);                          // Convert string to integer
+                    }
+                    dataStack.push(value);                              // Push the value onto the data stack
+                    cout << "  -> PUSH: value = " << value  << ", stack size = " << dataStack.size() << endl;
+                }
+            }
+            else if (opcode == "POP") {                             // Check if instruction is POP
+                if (tokens.size() > 1) {                                // Verify that at least 2 tokens exist (POP, destination)
+                    // Remove colon if present
+                    string operand = tokens[1];                         // Extract the destination operand token
+                    if (operand.back() == ':') {                        // Check if colon is present at the end
+                        operand = operand.substr(0, operand.length() - 1); // Remove the trailing colon
+                    }
+                    
+                    if (IsRegister(operand)) {                          // Check if destination is a register
+                        if (!dataStack.empty()) {                       // Check if the stack is not empty
+                            registers[operand] = dataStack.top();       // Get top value from stack and store in register
+                            dataStack.pop();                            // Remove the top value from the stack
+                            cout << "  -> POP: " << operand << " = "  << registers[operand] << ", stack size = "  << dataStack.size() << endl;
+                        } else {                                        // Stack is empty
+                            cout << "  -> ERROR: Stack underflow!" << endl; // Print error message
+                        }
+                    }
+                }
+            }
             
             // ========== MEMORY MANAGEMENT INSTRUCTIONS ==========
-            if (opcode == "ALLOC") {                                // Allocate memory block instruction
+            else if (opcode == "ALLOC") {                           // Allocate memory block instruction
                 if (tokens.size() > 2 && IsRegister(tokens[1]) && IsRegister(tokens[2])) {
                     int size = registers[tokens[1]];                // Get size from source register
                     int address = AllocateVirtualMemory(size);      // Allocate memory of specified size
@@ -325,9 +425,9 @@ class VirtualMachine {
                     FreeAllMatrices();                              // Free existing matrices first
                 }
                 int totalElements = matrixSize * matrixSize;                      // Calculate total elements per matrix
-                matrixPointers["matrixA"] = AllocateVirtualMemory(totalElements); // Allocate matrix A
-                matrixPointers["matrixB"] = AllocateVirtualMemory(totalElements); // Allocate matrix B
-                matrixPointers["matrixC"] = AllocateVirtualMemory(totalElements); // Allocate matrix C
+                matrixPointers["matrixA"] = AllocateVirtualMemory(totalElements * 4); // Allocate matrix A (4 bytes per element)
+                matrixPointers["matrixB"] = AllocateVirtualMemory(totalElements * 4); // Allocate matrix B
+                matrixPointers["matrixC"] = AllocateVirtualMemory(totalElements * 4); // Allocate matrix C
                 
                 registers["R1"] = matrixPointers["matrixA"]; // Store matrix A address in R1
                 registers["R2"] = matrixPointers["matrixB"]; // Store matrix B address in R2
@@ -394,9 +494,24 @@ class VirtualMachine {
             }
 
             // ========== I/O OPERATIONS ==========
-            else if (opcode == "PRINT_STR") {                       // Print string from string memory
-                if (tokens.size() > 1 && stringMemory.find(tokens[1]) != stringMemory.end()) {
-                    cout << stringMemory[tokens[1]];                // Output predefined string
+            else if (opcode == "PRINT_STR") {                       // Print string from string memory OR buffer
+                if (tokens.size() > 1) {
+                    string strName = tokens[1];
+                    
+                    // Check if it's a predefined string message
+                    if (stringMemory.find(strName) != stringMemory.end()) {
+                        cout << stringMemory[strName];              // Output predefined string
+                    }
+                    // Check if it's a string buffer (read from virtual memory)
+                    else if (stringBuffers.find(strName) != stringBuffers.end()) {
+                        int bufferAddr = stringBuffers[strName];
+                        string str = ReadStringFromMemory(bufferAddr);
+                        cout << str;                                // Output string from memory
+                        cout << "  -> Printed from buffer '" << strName << "': '" << str << "'" << endl;
+                    }
+                    else {
+                        cout << "  -> ERROR: String '" << strName << "' not found!" << endl;
+                    }
                 }
             }
             else if (opcode == "READ_INT") {                        // Read integer input from user
@@ -418,15 +533,39 @@ class VirtualMachine {
                     }
                 }
             }
+            else if (opcode == "READ_STRING") {                     // Read string input from user
+                if (tokens.size() > 1 && IsRegister(tokens[1])) {
+                    cout << "  Enter string: ";
+                    string input;
+                    
+                    // Clear any leftover newline from previous cin operations
+                    if (cin.peek() == '\n') { cin.ignore();} 
+
+                    getline(cin, input);                            // Read entire line including spaces
+                    int bufferAddress = registers["R3"];            // Get buffer address from register R3 (convention: R3 holds target buffer address)
+                    WriteStringToMemory(bufferAddress, input);      // Write string to memory (byte by byte)
+                    registers[tokens[1]] = input.length();          // Store length in the specified register (usually R0)
+                    
+                    cout << "  -> READ_STRING: stored '" << input << "' at address 0x" << hex << bufferAddress << dec << ", length = " << input.length() << endl;
+                    // Debug: Verify what was written to memory
+                    cout << "  -> DEBUG: Reading back from memory: '"<< ReadStringFromMemory(bufferAddress) << "'" << endl;
+                    for (int i = 0; i < input.length(); i++) {
+                        cout << "  -> Memory[0x" << hex << (bufferAddress + i) << dec   << "] = " << ReadVirtualMemory(bufferAddress + i)  << " ('" << (char)ReadVirtualMemory(bufferAddress + i) << "')" << endl;
+                    }
+                }
+            }
             else if (opcode == "WRITE_INT") {                       // Output integer value
                 if (tokens.size() > 1 && IsRegister(tokens[1])) {
                     cout << "  WRITE_INT " << tokens[1] << endl;
                     cout << registers[tokens[1]];                   // Print register value
                 }
             }
-            else if (opcode == "READ_CHAR") {                      // Read a single character from user
+            else if (opcode == "READ_CHAR") {                       // Read a single character from user
                 char c;
                 cin >> c;
+            }
+            else if (opcode == "Crlf") {                            // Print newline (Irvine32 equivalent)
+                cout << endl;
             }
 
             // ========== ARITHMETIC INSTRUCTIONS ========== 
@@ -438,8 +577,8 @@ class VirtualMachine {
                     
                     // Parse second operand (register, variable, or immediate)
                     if (IsRegister(tokens[2])) { operand2 = registers[tokens[2]]; }               // operand 2 is a register
-                    else if (IsVariable(tokens[2])) { operand2 = GetVariableValue(tokens[2]);}    // operand 2 is a varaible
-                    else { operand2 = stoi(tokens[2]); }                                          // operaad 2 is a immediate value
+                    else if (IsVariable(tokens[2])) { operand2 = GetVariableValue(tokens[2]);}    // operand 2 is a variable
+                    else { operand2 = stoi(tokens[2]); }                                          // operand 2 is a immediate value
 
                     registers[tokens[1]] += operand2;   // Add source to destination register
                     cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
@@ -478,7 +617,7 @@ class VirtualMachine {
                     cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
                 }
             }
-            else if (opcode == "IDIV") {
+            else if (opcode == "IDIV") {                            // Division
                 // Signed division: EDX:EAX / divisor
                 if (tokens.size() > 1) {
                     cout << "  IDIV " << tokens[1] << endl;
@@ -511,7 +650,7 @@ class VirtualMachine {
                     }
                 }
             }
-            else if (opcode == "IMUL") {
+            else if (opcode == "IMUL") {                            // Multiplication
                 // Signed multiplication
                 if (tokens.size() > 2 && IsRegister(tokens[1])) {
                     cout << "  IMUL " << tokens[1] << ", " << tokens[2] << endl;
@@ -531,73 +670,197 @@ class VirtualMachine {
                     SF = (registers[tokens[1]] < 0);
                     // For IMUL, OF and CF are set if the result exceeds 32-bit signed range
                     OF = CF = (result > INT_MAX || result < INT_MIN);
-                    
                     cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
                 }
             }
-            else if (opcode == "MOV") {
-                if (tokens.size() > 2) {
-                    cout << "  MOV " << tokens[1] << ", " << tokens[2] << endl;
+            else if (opcode == "MOV") {                             // Check if instruction is MOV
+                if (tokens.size() > 2) {                                                       // Verify that at least 3 tokens exist (MOV, dest, src)
+                    cout << "  MOV " << tokens[1] << ", " << tokens[2] << endl;                // Print the MOV instruction being executed
                     
-                    // Handle MOV from register to calculator variables 
-                    if (IsRegister(tokens[1])) {
-                        if (IsRegister(tokens[2])) { 
-                            registers[tokens[1]] = registers[tokens[2]]; 
-                        } else if (IsVariable(tokens[2])) { 
-                            registers[tokens[1]] = GetVariableValue(tokens[2]); 
-                        } else { 
-                            registers[tokens[1]] = stoi(tokens[2]); 
+                    // Handle MOV to register
+                    if (IsRegister(tokens[1])) {                                               // Check if destination is a register
+                        
+                        // Handle "OFFSET bufferName" syntax
+                        if (tokens[2] == "OFFSET" && tokens.size() > 3) {                      // Check if source uses OFFSET keyword
+                            string bufferName = tokens[3];                                     // Extract the buffer name
+                            int address = GetStringBufferAddress(bufferName);                  // Get the address of the buffer
+                            registers[tokens[1]] = address;                                    // Store address in destination register
+                            cout << "  -> " << tokens[1] << " = 0x" << hex << address  << dec << " (address of " << bufferName << ")" << endl;  // Print the address stored in hex format
                         }
-                        cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+
+                        // Regular MOV operations
+                        else if (IsRegister(tokens[2])) {                                      // Check if source is also a register
+                            registers[tokens[1]] = registers[tokens[2]];                       // Copy source register value to destination
+                        }
+                        else if (IsVariable(tokens[2])) {                                      // Check if source is a variable
+                            registers[tokens[1]] = GetVariableValue(tokens[2]);                // Get variable value and store in destination register
+                        }
+                        else {                                                                 // Source must be an immediate value
+                            registers[tokens[1]] = stoi(tokens[2]);                            // Convert string to integer and store in destination
+                        }
+                        
+                        if (tokens[2] != "OFFSET") {                                           // Only print if not an OFFSET operation (already printed above)
+                            cout << "  -> " << tokens[1] << " = " << registers[tokens[1]]  << endl; // Print the final value in the destination register
+                        }
                         
                         // MOV to register affects flags
-                        int result = registers[tokens[1]];
-                        ZF = (result == 0);                      // Set Zero Flag
-                        SF = (result < 0);                       // Set Sign Flag
-                        cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << endl;
+                        int result = registers[tokens[1]];                                     // Get the result value from the destination register
+                        ZF = (result == 0);                                                    // Set Zero Flag if result is zero
+                        SF = (result < 0);                                                     // Set Sign Flag if result is negative
+                        cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << endl;               // Print the updated flag values
                     }
+                    
                     // Handle MOV from calculator variables to registers (source is calculator variable)
-                    else if (IsVariable(tokens[1])) {
-                        int value;
-                        if (IsRegister(tokens[2])) {
-                            value = registers[tokens[2]];
-                        } else if (IsVariable(tokens[2])) {
-                            value = GetVariableValue(tokens[2]);
-                        } else {
-                            value = stoi(tokens[2]);
+                    else if (IsVariable(tokens[1])) {                                          // Check if destination is a variable
+                        int value;                                                             // Declare variable to hold the value
+
+                        if (IsRegister(tokens[2])) {                                           // Check if source is a register
+                            value = registers[tokens[2]];                                      // Get value from source register
                         }
-                        SetVariableValue(tokens[1], value);
-                        cout << "  -> " << tokens[1] << " = " << GetVariableValue(tokens[1]) << endl;
+                        else if (IsVariable(tokens[2])) {                                      // Check if source is a variable
+                            value = GetVariableValue(tokens[2]);                               // Get value from source variable
+                        }
+                        else {                                                                 // Source must be an immediate value
+                            value = stoi(tokens[2]);                                           // Convert string to integer
+                        }
+
+                        SetVariableValue(tokens[1], value);                                    // Store the value in the destination variable
+                        cout << "  -> " << tokens[1] << " = " << GetVariableValue(tokens[1]) << endl;   // Print the final value stored in the variable
+                    }
+                    
+                    // Handle "MOV BYTE PTR [reg + offset], value"
+                    else if (tokens[1] == "BYTE" && tokens.size() > 4 && tokens[2] == "PTR") { // Check for BYTE PTR memory operation syntax
+                        // Parse memory address: [R5 + R1] or [R5 + 0]
+                        string addrExpr = tokens[3];                                           // Extract address expression (should be like "[R5")
+                        string offsetExpr = tokens[4];                                         // Extract offset expression (should be "+")
+                        if (addrExpr[0] == '[') {                                              // Check if opening bracket is present
+                            addrExpr = addrExpr.substr(1);                                     // Remove the opening bracket
+                        }
+                        
+                        int baseAddr = 0;                                                      // Initialize base address to zero
+                        int offset = 0;                                                        // Initialize offset to zero
+                        
+                        if (IsRegister(addrExpr)) {                                            // Check if address expression is a register
+                            baseAddr = registers[addrExpr];                                    // Get the base address from the register
+                        }
+                        
+                        // Handle offset (could be "+", "R1]", or "0]")
+                        if (tokens.size() > 5) {                                               // Check if offset tokens exist
+                            string offsetToken = tokens[5];                                    // Extract the offset token
+                            if (offsetToken.back() == ']') {                                   // Check if closing bracket is present
+                                offsetToken = offsetToken.substr(0, offsetToken.length() - 1); // Remove the closing bracket
+                            }
+                            
+                            if (IsRegister(offsetToken)) {                                     // Check if offset is a register
+                                offset = registers[offsetToken];                               // Get offset value from register
+                            }
+                            else {                                                             // Offset must be an immediate value
+                                offset = stoi(offsetToken);                                    // Convert string to integer
+                            }
+                        }
+                        
+                        int finalAddress = baseAddr + offset;                                  // Calculate final memory address
+                        
+                        // Get value to store
+                        int value = 0;                                                         // Initialize value variable
+                        string valueToken = tokens[tokens.size() - 1];                         // Get the last token (the value to store)
+                        if (valueToken.back() == ',') {                                        // Check if comma is present at the end
+                            valueToken = valueToken.substr(0, valueToken.length() - 1);       // Remove the trailing comma
+                        }
+                        
+                        if (IsRegister(valueToken)) {                                          // Check if value token is a register
+                            value = registers[valueToken];                                     // Get value from the register
+                        }
+                        else {                                                                 // Value must be an immediate value
+                            value = stoi(valueToken);                                          // Convert string to integer
+                        }
+                        
+                        WriteVirtualMemory(finalAddress, value);                               // Write the value to virtual memory at final address
+                        cout << "  -> MOV BYTE PTR: stored value " << value << " at address 0x" // Print operation confirmation
+                             << hex << finalAddress << dec << endl;
+                    }
+                }
+            }
+            else if (opcode == "MOVZX") {                           // Check if instruction is MOVZX (move with zero-extend)
+                if (tokens.size() > 3) {                                                       // Verify that at least 4 tokens exist
+                    string destReg = tokens[1];                                                // Extract destination register
+                    if (destReg.back() == ',') {                                               // Check if comma is present at the end
+                        destReg = destReg.substr(0, destReg.length() - 1);                     // Remove the trailing comma
+                    }
+                    
+                    if (IsRegister(destReg) && tokens[2] == "BYTE" && tokens[3] == "PTR") {   // Verify MOVZX BYTE PTR syntax
+                        // tokens[4] should be something like "[R4" and remaining should be "+", "R1]"
+                        int baseAddr = 0;                                                      // Initialize base address to zero
+                        int offset = 0;                                                        // Initialize offset to zero
+                        
+                        // Parse [R4 + R1] format more carefully
+                        if (tokens.size() >= 5) {                                              // Check if address tokens exist
+                            string addrExpr = tokens[4];                                       // Extract address expression (e.g., "[R4")
+                            if (addrExpr[0] == '[') {                                          // Check if opening bracket is present
+                                addrExpr = addrExpr.substr(1);                                 // Remove the opening bracket
+                            }
+                            if (IsRegister(addrExpr)) {                                        // Check if address expression is a register
+                                baseAddr = registers[addrExpr];                                // Get the base address from the register
+                            }
+                            
+                            // Now parse the offset if it exists
+                            if (tokens.size() >= 7 && tokens[5] == "+") {                      // Check if offset operator and tokens exist
+                                string offsetToken = tokens[6];                                // Extract the offset token
+                                // Remove closing bracket if present
+                                if (offsetToken.back() == ']') {                               // Check if closing bracket is present
+                                    offsetToken = offsetToken.substr(0, offsetToken.length() - 1); // Remove the closing bracket
+                                }
+                                
+                                if (IsRegister(offsetToken)) {                                 // Check if offset is a register
+                                    offset = registers[offsetToken];                           // Get offset value from register
+                                }
+                                else {                                                         // Offset must be an immediate value
+                                    offset = stoi(offsetToken);                                // Convert string to integer
+                                }
+                            }
+                        }
+                        
+                        int finalAddress = baseAddr + offset;                                  // Calculate final memory address
+                        int byteValue = ReadVirtualMemory(finalAddress) & 0xFF;               // Read byte from virtual memory and mask to 8 bits (zero-extend)
+                        registers[destReg] = byteValue;                                        // Store the zero-extended byte value in destination register
+                        // Print operation confirmation
+                        cout << "  -> MOVZX: loaded byte " << byteValue << " from address 0x" << hex << finalAddress << dec << " into " << destReg << endl;
                     }
                 }
             }
             
             // ========== COMPARISON AND BRANCHING ==========
-            else if (opcode == "CMP") {                      // Compare two values
+            else if (opcode == "CMP") {                             // Compare two values
                 if (tokens.size() > 2) {                     // Check 1: Verify instruction has at least 3 tokens (opcode + 2 operands)
-                    cout << "  CMP " << tokens[1] << ", " << tokens[2] << endl;
+                    // Remove colons from operands
+                    string op1 = tokens[1];
+                    string op2 = tokens[2];
+                    if (op1.back() == ':') op1 = op1.substr(0, op1.length() - 1);
+                    if (op2.back() == ':') op2 = op2.substr(0, op2.length() - 1);
+                    
+                    cout << "  CMP " << op1 << ", " << op2 << endl;
                     int val1, val2;                          // Values to compare
                     
                     // Parse first operand (can be register, immediate, special variable, or calculator variable)
-                    if (tokens[1] == "matrixAllocated") { 
+                    if (op1 == "matrixAllocated") { 
                         val1 = matrixAllocated ? 1 : 0; 
-                    } else if (IsRegister(tokens[1])) { 
-                        val1 = registers[tokens[1]]; 
-                    } else if (IsVariable(tokens[1])) {
-                        val1 = GetVariableValue(tokens[1]);
+                    } else if (IsRegister(op1)) { 
+                        val1 = registers[op1]; 
+                    } else if (IsVariable(op1)) {
+                        val1 = GetVariableValue(op1);
                     } else { 
-                        val1 = stoi(tokens[1]); 
+                        val1 = stoi(op1); 
                     }
                     
                     // Parse second operand (can be register, immediate, special variable, or calculator variable)
-                    if (tokens[2] == "matrixAllocated") { 
+                    if (op2 == "matrixAllocated") { 
                         val2 = matrixAllocated ? 1 : 0; 
-                    } else if (IsRegister(tokens[2])) { 
-                        val2 = registers[tokens[2]]; 
-                    } else if (IsVariable(tokens[2])) {
-                        val2 = GetVariableValue(tokens[2]);
+                    } else if (IsRegister(op2)) { 
+                        val2 = registers[op2]; 
+                    } else if (IsVariable(op2)) {
+                        val2 = GetVariableValue(op2);
                     } else { 
-                        val2 = stoi(tokens[2]); 
+                        val2 = stoi(op2); 
                     }
                     
                     int result = val1 - val2;                                               // Compute comparison result
@@ -611,7 +874,7 @@ class VirtualMachine {
                     cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << " CF=" << CF << endl;
                 }
             }
-            else if (opcode == "JE") {                       // Jump if equal (ZF == 1)
+            else if (opcode == "JE") {                              // Jump if equal (ZF == 1)
                 if (tokens.size() > 1) {
                     if (ZF) {                                // Check Zero Flag
                         string label = tokens[1];            // Target label
@@ -625,7 +888,7 @@ class VirtualMachine {
                     }
                 }
             }
-            else if (opcode == "JNE") {                      // Jump if not equal (ZF == 0)
+            else if (opcode == "JNE") {                             // Jump if not equal (ZF == 0)
                 if (tokens.size() > 1) {
                     if (!ZF) {                               // Check Zero Flag is false
                         string label = tokens[1];            // Target label
@@ -639,7 +902,7 @@ class VirtualMachine {
                     }
                 }
             }
-            else if (opcode == "JL") {                       // Jump if less (SF != OF)
+            else if (opcode == "JL") {                              // Jump if less (SF != OF)
                 if (tokens.size() > 1) {
                     if (SF != OF) {                          // JL condition: Sign Flag != Overflow Flag
                         string label = tokens[1];            // Target label
@@ -653,7 +916,7 @@ class VirtualMachine {
                     }
                 }
             }
-            else if (opcode == "JLE") {                      // Jump if less or equal (ZF || (SF != OF))
+            else if (opcode == "JLE") {                             // Jump if less or equal (ZF || (SF != OF))
                 if (tokens.size() > 1) {
                     if (ZF || (SF != OF)) {                  // JLE condition: equal OR less
                         string label = tokens[1];            // Target label
@@ -667,7 +930,21 @@ class VirtualMachine {
                     }
                 }
             }
-            else if (opcode == "JMP") {                      // Unconditional jump
+            else if (opcode == "JGE") {                             // Jump if greater or equal (SF == OF)
+                if (tokens.size() > 1) {
+                    if (SF == OF) {                          // JGE condition
+                        string label = tokens[1];
+                        if (labels.find(label) != labels.end()) {
+                            programCounter = labels[label];
+                            cout << "  -> Jump greater or equal to " << label << " at line " << programCounter << endl;
+                            incrementPC = false;
+                        }
+                    } else {
+                        cout << "  -> JGE condition false (SF=" << SF << ", OF=" << OF << "), not jumping" << endl;
+                    }
+                }
+            }
+            else if (opcode == "JMP") {                             // Unconditional jump
                 if (tokens.size() > 1) {
                     string label = tokens[1];                // Target label
                     if (labels.find(label) != labels.end()) {
@@ -679,35 +956,67 @@ class VirtualMachine {
             }
 
             // ========== SYSTEM INSTRUCTIONS ==========
-            else if (opcode == "CLRSC") {                    // Clear screen instruction
-                cout << "  CLRSC instruction executed" << endl;
-                if (registers["R3"] == 90) {                 // Check if R3 contains ASCII 'Z' (90)
-                    system("cls");                           // Clear console screen
-                    cout << "  -> Screen cleared (Z character detected in R3)" << endl;
-                } else {
-                    cout << "  -> Screen NOT cleared - R3 does not contain 'Z' character" << endl;
+            else if (opcode == "INC") {                             // Increment register by 1
+                // Remove colon if present
+                string operand = tokens[1];
+                if (operand.back() == ':') {
+                    operand = operand.substr(0, operand.length() - 1);
+                }
+                
+                if (tokens.size() > 1 && IsRegister(operand)) {
+                    cout << "  INC " << operand << endl;
+                    registers[operand]++;
+                    cout << "  -> " << operand << " = " << registers[operand] << endl;
+                    
+                    // Set flags
+                    int result = registers[operand];
+                    ZF = (result == 0);
+                    SF = (result < 0);
+                    OF = (result == INT_MIN);  // Overflow if wrapped around
+                    cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << endl;
                 }
             }
-            else if (opcode == "HALT") {                     // Stop program execution
-                running = false;                             // Set VM running flag to false
-                cout << "  -> Program halted." << endl;      // Display halt message
+            else if (opcode == "DEC") {                             // Decrement register by 1
+                if (tokens.size() > 1 && IsRegister(tokens[1])) {
+                    cout << "  DEC " << tokens[1] << endl;
+                    registers[tokens[1]]--;
+                    cout << "  -> " << tokens[1] << " = " << registers[tokens[1]] << endl;
+                    
+                    // Set flags
+                    int result = registers[tokens[1]];
+                    ZF = (result == 0);
+                    SF = (result < 0);
+                    OF = (result == INT_MAX);  // Overflow if wrapped around
+                    cout << "  -> Flags: ZF=" << ZF << " SF=" << SF << " OF=" << OF << endl;
+                }
             }
             else if (opcode == "CDQ") {
                 // Convert Doubleword to Quadword (sign extend EAX into EDX:EAX)
                 // In our simple VM, we'll simulate this for division
                 if (registers["R0"] < 0) {
-                    registers["R1"] = -1; // R3 is EDX equivalent (all bits 1 for negative)
+                    registers["R1"] = -1; // R1 is EDX equivalent (all bits 1 for negative)
                 } else {
-                    registers["R1"] = 0;  // R3 is EDX equivalent (all bits 0 for positive)
+                    registers["R1"] = 0;  // R1 is EDX equivalent (all bits 0 for positive)
                 }
                 cout << "  -> CDQ: (R0:R1) EDX:EAX prepared for division" << endl;
             }
-            return incrementPC;                              // Return whether to increment program counter
+            else if (opcode == "CLRSC") {                           // Clear screen instruction
+                cout << "  CLRSC instruction executed" << endl;
+                _getch();;                                  // Waits for user to press any key
+                system("cls");                              // Clear console screen
+                cout << "  -> Screen cleared" << endl;
+            }
+            else if (opcode == "HALT") {                            // Stop program execution
+                running = false;                             // Set VM running flag to false
+                cout << "  -> Program halted." << endl;      // Display halt message
+            }
+            
+            return incrementPC;                                     // Return whether to increment program counter
         }
         
-        void InputMatrixValues(int baseAddress) {             // Read matrix values from user input
-            for (int i = 0; i < matrixSize; i++) {            // Iterate through each row of matrix
-                for (int j = 0; j < matrixSize; j++) {        // Iterate through each column of matrix
+        void InputMatrixValues(int baseAddress) {                       // Read matrix values from user input
+            for (int i = 0; i < matrixSize; i++) {                      // Iterate through each row of matrix
+                for (int j = 0; j < matrixSize; j++) {                  // Iterate through each column of matrix
                     cout << stringMemory["matrixElemPrompt"] << i << "," << j << stringMemory["matrixElemPrompt2"]; // Display prompt for element [i][j]
                     int value;
                     cin >> value;                             // Read integer value from user
@@ -717,43 +1026,49 @@ class VirtualMachine {
             }
         }
 
-        void DisplayMatrix(int baseAddress) {                 // Print matrix contents to console
-            for (int i = 0; i < matrixSize; i++) {            // Iterate through each row
+        // Helper function to display all matrix
+        void DisplayMatrix(int baseAddress) {                           // Print matrix contents to console
+            for (int i = 0; i < matrixSize; i++) {                      // Iterate through each row
                 cout << stringMemory["matrixDisplayRow"] << i << stringMemory["matrixDisplayCol"]; // Display row header
-                for (int j = 0; j < matrixSize; j++) {        // Iterate through each column
+                for (int j = 0; j < matrixSize; j++) {                  // Iterate through each column
                     int elementAddress = GetMatrixElementAddress(baseAddress, i, j, matrixSize); // Get element memory address
-                    int value = ReadVirtualMemory(elementAddress); // Read value from virtual memory
-                    cout << value << stringMemory["spaceChar"];    // Print value followed by space
+                    int value = ReadVirtualMemory(elementAddress);      // Read value from virtual memory
+                    cout << value << stringMemory["spaceChar"];         // Print value followed by space
                 }
-                cout << endl;                                      // New line after each row
+                cout << endl;                                           // New line after each row
             }
         }
 
-        void FreeAllMatrices() {                             // Deallocate memory for all matrices
-            if (matrixPointers["matrixA"] != 0) {            // Check if matrix A is allocated
-                FreeVirtualMemory(matrixPointers["matrixA"], matrixSize * matrixSize); // Free matrix A memory
-                matrixPointers["matrixA"] = 0;               // Reset matrix A pointer to unallocated
+        // Helper function to free all matrix
+        void FreeAllMatrices() {                                        // Deallocate memory for all matrices
+            if (matrixPointers["matrixA"] != 0) {                       // Check if matrix A is allocated
+                FreeVirtualMemory(matrixPointers["matrixA"], matrixSize * matrixSize * 4); // Free matrix A memory
+                matrixPointers["matrixA"] = 0;                          // Reset matrix A pointer to unallocated
             }
-            if (matrixPointers["matrixB"] != 0) {            // Check if matrix B is allocated
-                FreeVirtualMemory(matrixPointers["matrixB"], matrixSize * matrixSize); // Free matrix B memory
-                matrixPointers["matrixB"] = 0;               // Reset matrix B pointer to unallocated
+            if (matrixPointers["matrixB"] != 0) {                       // Check if matrix B is allocated
+                FreeVirtualMemory(matrixPointers["matrixB"], matrixSize * matrixSize * 4); // Free matrix B memory
+                matrixPointers["matrixB"] = 0;                          // Reset matrix B pointer to unallocated
             }
-            if (matrixPointers["matrixC"] != 0) {            // Check if matrix C is allocated
-                FreeVirtualMemory(matrixPointers["matrixC"], matrixSize * matrixSize); // Free matrix C memory
-                matrixPointers["matrixC"] = 0;               // Reset matrix C pointer to unallocated
+            if (matrixPointers["matrixC"] != 0) {                       // Check if matrix C is allocated
+                FreeVirtualMemory(matrixPointers["matrixC"], matrixSize * matrixSize * 4); // Free matrix C memory
+                matrixPointers["matrixC"] = 0;                          // Reset matrix C pointer to unallocated
             }
-            
-            matrixSize = 0;                                  // Reset matrix size to zero
-            matrixAllocated = false;                         // Set allocation flag to false
+            matrixSize = 0;                                             // Reset matrix size to zero
+            matrixAllocated = false;                                    // Set allocation flag to false
         }
 
         // Helper function to get variable value
         int GetVariableValue(const string& varName) {
-            if (varName == "prevResult") return prevResult;
+            if (varName =="prevResult") return prevResult;
             if (varName == "firstNum") return firstNum;
             if (varName == "secondNum") return secondNum;
             if (varName == "remainder") return remainder;
             if (varName == "usePrev") return usePrev ? 1 : 0;
+            
+            // Check string variables (addresses and lengths)
+            if (stringVariables.find(varName) != stringVariables.end()) {
+                return stringVariables[varName];
+            }
             return 0; // default
         }
         
@@ -764,27 +1079,32 @@ class VirtualMachine {
             else if (varName == "secondNum") secondNum = value;
             else if (varName == "remainder") remainder = value;
             else if (varName == "usePrev") usePrev = (value != 0);
-        }
-        
-        vector<string> Tokenize(const string& line) {        // Split instruction line into individual tokens
-            vector<string> tokens;                           // Vector to store resulting tokens
-            stringstream ss(line);                           // Create string stream from input line
-            string token;                                    // Temporary storage for each token
-            while (ss >> token) {                            // Extract tokens separated by whitespace
-                token.erase(remove(token.begin(), token.end(), ','), token.end()); // Remove comma characters from token
-                tokens.push_back(token);                     // Add cleaned token to result vector
+            
+            // Set string variables
+            else if (stringVariables.find(varName) != stringVariables.end()) {
+                stringVariables[varName] = value;
             }
-            return tokens;                                   // Return vector of tokens
         }
         
-        bool IsRegister(const string& token) {               // Check if token represents a valid register name
-            // First character must be 'R'     Token must be exactly 2 characters long      Second character must be a digit (0-5)
-            return token[0] == 'R' && token.size() == 2 && isdigit(token[1]);                           
+        vector<string> Tokenize(const string& line) {                   // Split instruction line into individual tokens
+            vector<string> tokens;                                      // Vector to store resulting tokens
+            stringstream ss(line);                                      // Create string stream from input line
+            string token;                                               // Temporary storage for each token
+            while (ss >> token) {                                       // Extract tokens separated by whitespace
+                token.erase(remove(token.begin(), token.end(), ','), token.end()); // Remove comma characters from token
+                tokens.push_back(token);                                // Add cleaned token to result vector
+            }
+            return tokens;                                              // Return vector of tokens
+        }
+        
+        // Helper function to check if a token is a regitser name
+        bool IsRegister(const string& token) {                          // Check if token represents a valid register name
+            return token[0] == 'R' && token.size() == 2 && isdigit(token[1]);   // First character must be 'R'     Token must be exactly 2 characters long      Second character must be a digit (0-5)
         }
         
         // Helper function to check if a token is a variable name
         bool IsVariable(const string& token) {
-            return token == "prevResult" || token == "firstNum" || token == "secondNum" || token == "remainder" || token == "usePrev";  // Your specific variable names
+            return token == "prevResult" || token == "firstNum" || token == "secondNum" || token == "remainder" || token == "usePrev" || token == "string1Addr" || token == "string2Addr" || token == "string1Length" || token == "string2Length";
         }
 };
 
@@ -807,7 +1127,7 @@ int main() {
         testFile << "    JMP MenuLoop\n";
         testFile << "\n";
 
-        // Core UI procedures
+       // Core UI procedures
         testFile << "DisplayWelcome:\n";
         testFile << "    PRINT_STR welcomeMsg\n";
         testFile << "    RET\n";
@@ -820,14 +1140,16 @@ int main() {
         testFile << "    READ_INT R0\n";
         testFile << "    RET\n";
         testFile << "\n";
+        testFile << "ReadUserString:\n";
+        testFile << "    READ_STRING R0\n";
+        testFile << "    RET\n";
+        testFile << "\n";
         testFile << "ContinueMessage:\n";
         testFile << "    PRINT_STR continueMsg\n";
         testFile << "    RET\n";
         testFile << "\n";
         testFile << "ScreenClear:\n";
         testFile << "    PRINT_STR continueMsg\n";
-        testFile << "    CALL ReadUserChoice\n";
-        testFile << "    MOV R3, R0\n";
         testFile << "    CLRSC\n";
         testFile << "    RET\n";
         testFile << "\n";
@@ -853,6 +1175,9 @@ int main() {
         testFile << "    CALL CalculatorModule\n";
         testFile << "    RET\n";
         testFile << "\n";
+        testFile << "StringSection:\n";
+        testFile << "    CALL StringModule\n";
+        testFile << "    RET\n";
         testFile << "MemorySection:\n";
         testFile << "    CALL MemoryModule\n";
         testFile << "    RET\n";
@@ -1002,11 +1327,13 @@ int main() {
         testFile << "    RET\n";
         testFile << "\n";
 
-        
 
-         // String manipulation module
+        // String manipulation module
         testFile << "; ========== STRING MANIPULATION MODULE ==========\n";
         testFile << "StringModule:\n";
+        testFile << "    PUSH R0\n";
+        testFile << "    PUSH R1\n";
+        testFile << "    PUSH R2\n";
         testFile << "StringMenuLoop:\n";
         testFile << "    CALL DisplayStringMenu\n";
         testFile << "    CALL ReadUserChoice\n";
@@ -1040,31 +1367,301 @@ int main() {
         testFile << "    JMP StringMenuLoop\n";
         testFile << "\n";
         testFile << "StringEnd:\n";
+        testFile << "    POP R2\n";
+        testFile << "    POP R1\n";
+        testFile << "    POP R0\n";
         testFile << "    RET\n";
         testFile << "\n";
 
         // String menu display
         testFile << "DisplayStringMenu:\n";
+        testFile << "    PUSH R3\n";
         testFile << "    PRINT_STR stringTitle\n";
         testFile << "    PRINT_STR stringMenu\n";
+        testFile << "    POP R3\n";
         testFile << "    RET\n";
         testFile << "\n";
 
         // String operation procedures
         testFile << "StringReverseProcedure:\n";
-        testFile << "    RET\n";
-        testFile << "StringReverseProcedure:\n";
+        testFile << "    PUSH R0\n";
+        testFile << "    PUSH R1\n";
+        testFile << "    PUSH R2\n";
+        testFile << "    PUSH R3\n";
+        testFile << "    PUSH R4\n";
+        testFile << "    PUSH R5\n";
+        testFile << "    PRINT_STR stringPrompt1\n";
+        testFile << "    MOV R3, OFFSET string1\n";
+        testFile << "    CALL ReadUserString\n";
+        testFile << "    CMP R0, 0\n";
+        testFile << "    JE ReverseEmpty\n";
+        testFile << "    MOV R4, R3\n";
+        testFile << "    MOV R2, R0\n";
+        testFile << "    MOV R1, 0\n";
         testFile << "\n";
+
+        // Push all characters onto stack (reverses order)
+        testFile << "ReversePushLoop:\n"; 
+        testFile << "    MOVZX R0, BYTE PTR [R4 + R1]\n";
+        testFile << "    PUSH R0\n";
+        testFile << "    INC R1\n";
+        testFile << "    CMP R1, R2\n";
+        testFile << "    JL ReversePushLoop\n";
+        testFile << "    MOV R1, 0\n";
+        testFile << "    MOV R5, OFFSET reversedString\n";
+        testFile << "\n";
+
+        // Pop characters back in reverse order (LIFO)
+        testFile << "ReversePopLoop:\n";
+        testFile << "    POP R0\n";
+        testFile << "    MOV BYTE PTR [R5 + R1], R0\n";
+        testFile << "    INC R1\n";
+        testFile << "    CMP R1, R2\n";
+        testFile << "    JL ReversePopLoop\n";
+        testFile << "\n";
+
+        // Null terminate the reversed string
+        testFile << "    MOV BYTE PTR [R5 + R1], 0\n";
+        testFile << "\n";
+
+        // Display results
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR originalStr\n";
+        testFile << "    PRINT_STR string1\n";
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR reversedStr\n";
+        testFile << "    PRINT_STR reversedString\n";
+        testFile << "    Crlf\n";
+        testFile << "    JMP ReverseDone\n";
+        testFile << "\n";
+
+        testFile << "ReverseEmpty:\n";
+        testFile << "    PRINT_STR emptyStringMsg\n";
+        testFile << "\n";
+
+        testFile << "ReverseDone:\n";
+        testFile << "    POP R5\n";
+        testFile << "    POP R4\n";
+        testFile << "    POP R3\n";
+        testFile << "    POP R2\n";
+        testFile << "    POP R1\n";
+        testFile << "    POP R0\n";
+        testFile << "    RET\n";
+        testFile << "\n";
+
+        // ========== STRING CONCATENATION PROCEDURE ==========
         testFile << "StringConcatenationProcedure:\n";
+        testFile << "    PUSH R0\n";
+        testFile << "    PUSH R1\n";
+        testFile << "    PUSH R2\n";
+        testFile << "    PUSH R3\n";
+        testFile << "    PUSH R4\n";
+        testFile << "    PUSH R5\n";
+        testFile << "\n";
+
+        // Get first string from user
+        testFile << "    PRINT_STR stringPrompt1\n";
+        testFile << "    MOV R3, OFFSET string1\n";
+        testFile << "    CALL ReadUserString\n";
+        testFile << "    MOV R1, R0\n"; // string1Length = R0
+        testFile << "\n";
+
+        // Get second string from user
+        testFile << "    PRINT_STR stringPrompt2\n";
+        testFile << "    MOV R3, OFFSET string2\n";
+        testFile << "    CALL ReadUserString\n";
+        testFile << "    MOV R2, R0\n"; // string2Length = R0
+        testFile << "\n";
+
+        // Setup for concatenation - copy first string to result
+        testFile << "    MOV R4, OFFSET string1\n";  // R4 = source 1
+        testFile << "    MOV R5, OFFSET resultString\n"; // R5 = destination
+        testFile << "    MOV R0, 0\n"; // R0 = index counter
+        testFile << "\n";
+
+        // Copy first string to result buffer
+        testFile << "ConcatLoop1:\n";
+        testFile << "    CMP R0, R1\n";
+        testFile << "    JGE ConcatLoop1Done\n";
+        testFile << "    MOVZX R3, BYTE PTR [R4 + R0]\n";
+        testFile << "    MOV BYTE PTR [R5 + R0], R3\n";
+        testFile << "    INC R0\n";
+        testFile << "    JMP ConcatLoop1\n";
+        testFile << "\n";
+
+        testFile << "ConcatLoop1Done:\n";
+        // Now copy second string after the first one
+        testFile << "    MOV R4, OFFSET string2\n"; // R4 = source 2
+        testFile << "    MOV R3, 0\n"; // R3 = index for second string
+        testFile << "\n";
+
+        testFile << "ConcatLoop2:\n";
+        testFile << "    CMP R3, R2\n";
+        testFile << "    JGE ConcatLoop2Done\n";
+        testFile << "    MOVZX R2, BYTE PTR [R4 + R3]\n";
+        testFile << "    MOV BYTE PTR [R5 + R0], R2\n";
+        testFile << "    INC R0\n";
+        testFile << "    INC R3\n";
+        testFile << "    JMP ConcatLoop2\n";
+        testFile << "\n";
+
+        testFile << "ConcatLoop2Done:\n";
+        // Null terminate the concatenated string
+        testFile << "    MOV BYTE PTR [R5 + R0], 0\n";
+        testFile << "\n";
+
+        // Display result to user
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR concatResult\n";
+        testFile << "    PRINT_STR resultString\n";
+        testFile << "    Crlf\n";
+        testFile << "\n";
+
+        testFile << "    POP R5\n";
+        testFile << "    POP R4\n";
+        testFile << "    POP R3\n";
+        testFile << "    POP R2\n";
+        testFile << "    POP R1\n";
+        testFile << "    POP R0\n";
         testFile << "    RET\n";
         testFile << "\n";
+
+        // ========== STRING COPY PROCEDURE ==========
         testFile << "StringCopyProcedure:\n";
+        testFile << "    PUSH R0\n";
+        testFile << "    PUSH R1\n";
+        testFile << "    PUSH R2\n";
+        testFile << "    PUSH R3\n";
+        testFile << "    PUSH R4\n";
+        testFile << "    PUSH R5\n";
+        testFile << "\n";
+
+        // Get source string from user
+        testFile << "    PRINT_STR stringPrompt1\n";
+        testFile << "    MOV R3, OFFSET string1\n";
+        testFile << "    CALL ReadUserString\n";
+        testFile << "\n";
+
+        // Setup copy operation
+        testFile << "    MOV R4, OFFSET string1\n"; // R4 = source
+        testFile << "    MOV R5, OFFSET copiedString\n"; // R5 = destination
+        testFile << "    MOV R2, R0\n"; // R2 = string length
+        testFile << "    MOV R1, 0\n"; // R1 = index counter
+        testFile << "\n";
+
+        testFile << "CopyLoop:\n";
+        testFile << "    CMP R1, R2\n";
+        testFile << "    JGE CopyDone\n";
+        testFile << "    MOVZX R0, BYTE PTR [R4 + R1]\n";
+        testFile << "    MOV BYTE PTR [R5 + R1], R0\n";
+        testFile << "    INC R1\n";
+        testFile << "    JMP CopyLoop\n";
+        testFile << "\n";
+
+        testFile << "CopyDone:\n";
+        // Null terminate the copied string
+        testFile << "    MOV BYTE PTR [R5 + R1], 0\n";
+        testFile << "\n";
+
+        // Display results to user
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR originalStr\n";
+        testFile << "    PRINT_STR string1\n";
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR copyResult\n";
+        testFile << "    PRINT_STR copiedString\n";
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR copySuccess\n";
+        testFile << "\n";
+
+        testFile << "    POP R5\n";
+        testFile << "    POP R4\n";
+        testFile << "    POP R3\n";
+        testFile << "    POP R2\n";
+        testFile << "    POP R1\n";
+        testFile << "    POP R0\n";
         testFile << "    RET\n";
         testFile << "\n";
+
+        // ========== STRING COMPARE PROCEDURE ==========
         testFile << "StringCompareProcedure:\n";
+        testFile << "    PUSH R0\n";
+        testFile << "    PUSH R1\n";
+        testFile << "    PUSH R2\n";
+        testFile << "    PUSH R3\n";
+        testFile << "    PUSH R4\n";
+        testFile << "    PUSH R5\n";
+        testFile << "\n";
+
+        // Get first string from user
+        testFile << "    PRINT_STR stringPrompt1\n";
+        testFile << "    MOV R3, OFFSET string1\n";
+        testFile << "    CALL ReadUserString\n";
+        testFile << "    MOV R1, R0\n"; // string1Length = R0
+        testFile << "\n";
+
+        // Get second string from user
+        testFile << "    PRINT_STR stringPrompt2\n";
+        testFile << "    MOV R3, OFFSET string2\n";
+        testFile << "    CALL ReadUserString\n";
+        testFile << "    MOV R2, R0\n"; // string2Length = R0
+        testFile << "\n";
+
+        // Check if lengths are different
+        testFile << "    CMP R1, R2\n";
+        testFile << "    JNE StringsNotEqual\n";
+        testFile << "\n";
+
+        // Setup comparison - lengths are equal, compare character by character
+        testFile << "    MOV R4, OFFSET string1\n"; // R4 = string1
+        testFile << "    MOV R5, OFFSET string2\n"; // R5 = string2
+        testFile << "    MOV R0, 0\n"; // R0 = index counter
+        testFile << "\n";
+
+        testFile << "CompareLoop:\n";
+        testFile << "    CMP R0, R1\n";
+        testFile << "    JGE StringsEqual\n";
+        testFile << "\n";
+
+        testFile << "    MOVZX R2, BYTE PTR [R4 + R0]\n"; // R2 = string1[index]
+        testFile << "    MOVZX R3, BYTE PTR [R5 + R0]\n"; // R3 = string2[index]
+        testFile << "\n";
+
+        testFile << "    CMP R2, R3\n";
+        testFile << "    JNE StringsNotEqual\n";
+        testFile << "\n";
+
+        // Check if null terminator
+        testFile << "    CMP R2, 0\n";
+        testFile << "    JE StringsEqual\n";
+        testFile << "\n";
+
+        testFile << "    INC R0\n";
+        testFile << "    JMP CompareLoop\n";
+        testFile << "\n";
+
+        testFile << "StringsNotEqual:\n";
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR compareNotEqual\n";
+        testFile << "    JMP CompareDone\n";
+        testFile << "\n";
+
+        testFile << "StringsEqual:\n";
+        testFile << "    Crlf\n";
+        testFile << "    PRINT_STR compareEqual\n";
+        testFile << "\n";
+
+        testFile << "CompareDone:\n";
+        testFile << "    POP R5\n";
+        testFile << "    POP R4\n";
+        testFile << "    POP R3\n";
+        testFile << "    POP R2\n";
+        testFile << "    POP R1\n";
+        testFile << "    POP R0\n";
         testFile << "    RET\n";
         testFile << "\n";
         
+
         // memory management module
         testFile << "; ========== MEMORY MANAGEMENT MODULE ==========\n";
         testFile << "MemoryModule:\n";
