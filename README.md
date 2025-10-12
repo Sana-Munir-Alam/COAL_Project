@@ -44,13 +44,16 @@ A comprehensive virtual machine emulator with arithmetic operation, string manip
   - Matrix input/output
   - Matrix addition
   - Memory-efficient storage using base addresses
-
-### Remaining Implementation
+ 
 - **String Operations Module**
   - String reverse procedure
   - String concatenation procedure
   - String copy procedure
   - String comparison procedure
+
+### Remaining Implementation
+- Color The Output
+- Write our own custom ISA
 
 ## Project Structure File
 - AssemblyCode.asm : Holds the original assembly code
