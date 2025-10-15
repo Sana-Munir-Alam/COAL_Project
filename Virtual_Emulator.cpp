@@ -12,8 +12,7 @@
 using namespace std;          // Use standard namespace to avoid std:: prefix
 
 class VirtualMachine {
-    private:
-
+private:
         unordered_map<string, int> registers;           // Storage for CPU registers (name-value pairs)
         unordered_map<string, string> stringMemory;     // Storage for named string constants
         vector<string> programMemory;                   // Stores program instructions as strings
@@ -91,59 +90,59 @@ class VirtualMachine {
         }
         
         void InitializeStringMemory() {                                 // Method to set up predefined string messages
-            stringMemory["welcomeMsg"] = "=== Virtual Machine with Memory Management ===\n";
+            stringMemory["welcomeMsg"] = "\033[38;5;201m=== Virtual Machine with Memory Management ===\033[0m\n";
             stringMemory["menuPrompt"] = "Please select an option:\n1. Calculator\n2. String Operations\n3. Memory Management\n4. Exit Program\nEnter your choice (1-4): ";
-            stringMemory["invalidChoice"] = "Invalid choice! Please enter 1-4.\n";
-            stringMemory["continueMsg"] = "Press any key to clear the screen...\n";
+            stringMemory["continueMsg"] = "\033[1;33mPress any key to clear the screen...\033[0m\n";
 
             // Calculator section
-            stringMemory["calcTitle"] = "===== Calculator Module =====\n";
+            stringMemory["calcTitle"] = "\033[38;5;201m===== Calculator Module =====\033[0m\n";
             stringMemory["calcMenu"] = "Select operation:\n1. Addition\n2. Subtraction\n3. Multiplication\n4. Division\n5. Return to Main Menu\nEnter your choice (1-5): ";
-            stringMemory["enterFirst"] = "Enter first number: ";
-            stringMemory["enterSecond"] = "Enter second number: ";
-            stringMemory["calcResult"] = "Result: ";
-            stringMemory["remainderMsg"] = " Remainder: ";
-            stringMemory["usePrevResult"] = "Use previous result as first number? (1=Yes, 0=No): ";
-            stringMemory["newCalcPrompt"] = "Perform new calculation? (1=Yes, 0=No/Exit): ";
+            stringMemory["enterFirst"] = "\033[1;33mEnter first number: \033[0m";
+            stringMemory["enterSecond"] = "\033[1;33mEnter second number: \033[0m";
+            stringMemory["calcResult"] = "\033[1;33mResult: \033[0m";
+            stringMemory["remainderMsg"] = "\033[1;33mRemainder: \033[0m";
+            stringMemory["usePrevResult"] = "\033[1;33mUse previous result as first number? (1=Yes, 0=No): \033[0m";
+            stringMemory["newCalcPrompt"] = "\033[1;33mPerform new calculation? (1=Yes, 0=No/Exit): \033[0m";
             
             // String section
-            stringMemory["stringTitle"] = "===== String Operations Module =====\n";
+            stringMemory["stringTitle"] = "\033[38;5;201m===== String Operations Module =====\033[0m\n\n";
             stringMemory["stringMenu"] = "Select string operation:\n1. String Reverse\n2. String Concatenation\n3. Copy String\n4. Compare Strings\n5. Return to Main Menu\nEnter your choice (1-5): ";
-            stringMemory["stringPrompt1"] = "Enter first string: ";
-            stringMemory["stringPrompt2"] = "Enter second string: ";
-            stringMemory["originalStr"] = "Original string: ";
-            stringMemory["reversedStr"] = "Reversed string: ";
-            stringMemory["concatResult"] = "Concatenated string: ";
-            stringMemory["copyResult"] = "Copied string: ";
-            stringMemory["copySuccess"] = "String successfully copied to new variable!\n";
-            stringMemory["compareEqual"] = "Strings are EQUAL!\n";
-            stringMemory["compareNotEqual"] = "Strings are NOT equal!\n";
+            stringMemory["stringPrompt1"] = "\033[1;33mEnter first string: \033[0m";
+            stringMemory["stringPrompt2"] = "\033[1;33mEnter second string: \033[0m";
+            stringMemory["originalStr"] = "\033[1;33mOriginal string: \033[0m";
+            stringMemory["reversedStr"] = "\033[1;33mReversed string: \033[0m";
+            stringMemory["concatResult"] = "\033[1;33mConcatenated string: \033[0m";
+            stringMemory["copyResult"] = "\033[1;33mCopied string: \033[0m";
+            stringMemory["copySuccess"] = "\033[38;5;118mString successfully copied to new variable! \033[0m\n";
+            stringMemory["compareEqual"] = "\033[38;5;118mStrings are EQUAL! \033[0m\n";
+            stringMemory["compareNotEqual"] = "\033[1;31mStrings are NOT equal!\033[0m\n";
             
             // Memory management section
-            stringMemory["memoryTitle"] = "===== Memory Management Module =====\n";
+            stringMemory["memoryTitle"] = "\033[38;5;201m===== Memory Management Module =====\033[0m\n\n";
             stringMemory["memoryMenu"] = "1. Create Matrix\n2. Display Matrix\n3. Add Matrices\n4. Free Matrix Memory\n5. Return to Main Menu\nEnter your choice (1-5): ";
-            stringMemory["matrixSizePrompt"] = "Enter matrix size (n for n x n matrix): ";
-            stringMemory["matrixElemPrompt"] = "Enter element [";
-            stringMemory["matrixElemPrompt2"] = "]: ";
-            stringMemory["matrixCreatedMsg"] = "Matrix successfully created and allocated!\n";
-            stringMemory["matrixFreedMsg"] = "Matrix successfully freed from memory!\n";
-            stringMemory["matrixAddResult"] = "Matrix addition result:\n";
-            stringMemory["matrixDisplayRow"] = "Row ";
+            stringMemory["matrixSizePrompt"] = "\033[1;33mEnter matrix size (n for n x n matrix): \033[0m";
+            stringMemory["matrixElemPrompt"] = "\033[1;33mEnter element [";
+            stringMemory["matrixElemPrompt2"] = "]: \033[0m";
+            stringMemory["matrixCreatedMsg"] = "\033[38;5;118mMatrix successfully created and allocated!\033[0m\n";
+            stringMemory["matrixFreedMsg"] = "\033[38;5;118mMatrix successfully freed from memory!\033[0m\n";
+            stringMemory["matrixAddResult"] = "\033[38;5;118mMatrix addition result:\033[0m\n";
+            stringMemory["matrixDisplayRow"] = "\033[38;5;166mRow \033[0m";
             stringMemory["matrixDisplayCol"] = ": ";
             stringMemory["spaceChar"] = " ";
-            stringMemory["matrixALabel"] = "Matrix A:\n";
-            stringMemory["matrixBLabel"] = "Matrix B:\n";
+            stringMemory["matrixALabel"] = "\033[38;5;166mMatrix A:\033[0m\n";
+            stringMemory["matrixBLabel"] = "\033[38;5;166mMatrix B:\033[0m\n";
             
             // Error messages
-            stringMemory["divByZeroMsg"] = "Error: Division by zero!\n";
-            stringMemory["emptyStringMsg"] = "Error: Empty string detected!\n";
-            stringMemory["noMatrixMsg"] = "Error: No matrix allocated. Please create matrix first.\n";
-            stringMemory["invalidChoiceMsg"] = "Error: Invalid choice. Please try again.\n";
+            stringMemory["invalidChoice"] = "\033[1;31mInvalid choice! Please enter 1-4.\033[0m\n";
+            stringMemory["divByZeroMsg"] = "\033[1;31mError: Division by zero!\033[0m\n";
+            stringMemory["emptyStringMsg"] = "\033[1;31mError: Empty string detected!\033[0m\n";
+            stringMemory["noMatrixMsg"] = "\033[1;31mError: No matrix allocated. Please create matrix first.\033[0m\n";
+            stringMemory["invalidChoiceMsg"] = "\033[1;31mError: Invalid choice. Please try again.\033[0m\n";
             stringMemory["inputBuffer"] = "";
             stringMemory["ClearCharacter"] = "Z";
         }
 
-        int AllocateVirtualMemory(int size) {                           // Allocates contiguous block in virtual memory
+        int AllocateVirtualMemory(int size) {                       // Allocates contiguous block in virtual memory
             int address = nextMemoryAddress;                        // Get next available memory address
             for (int i = 0; i < size; i++) {                        // Loop through each element to allocate
                 virtualMemory[address + i] = 0;                     // Initialize memory location to zero (byte-aligned)
@@ -248,7 +247,7 @@ class VirtualMachine {
             
             while (programCounter < programMemory.size() && running) {  // Loop while within bounds and VM running
                 string instruction = programMemory[programCounter];     // Fetch instruction at current PC
-                cout << "\n[PC=" << programCounter << "] Executing: " << instruction << endl; // Display execution info
+                cout << "\n\033[1;36m[PC=" << programCounter << "] \033[0mExecuting: \033[1;32m" << instruction << " \033[0m" << endl; // Display execution info
                 vector<string> tokens = Tokenize(instruction);          // Split instruction into tokens (opcode, operands)
                 
                 if (!tokens.empty()) {                                  // Check if instruction has valid tokens
@@ -629,7 +628,8 @@ class VirtualMachine {
                     else {  divisor = stoi(tokens[1]); }                                        // divisor is a immediate value
                     
                     if (divisor == 0) {
-                        cout << "  -> ERROR: Division by zero!" << endl;
+                         cout << "  -> ERROR: Division by zero!" << endl;
+                        
                         ZF = false; SF = false; OF = true; CF = true;
                     } else {
                         // Dividend is in R0:R1 (64-bit), result in R0, remainder in R1
@@ -1029,7 +1029,7 @@ class VirtualMachine {
         // Helper function to display all matrix
         void DisplayMatrix(int baseAddress) {                           // Print matrix contents to console
             for (int i = 0; i < matrixSize; i++) {                      // Iterate through each row
-                cout << stringMemory["matrixDisplayRow"] << i << stringMemory["matrixDisplayCol"]; // Display row header
+                cout << "\033[38;5;118m" << stringMemory["matrixDisplayRow"] << "\033[38;5;118m" << i << stringMemory["matrixDisplayCol"] << "\033[0m"; // Display row header
                 for (int j = 0; j < matrixSize; j++) {                  // Iterate through each column
                     int elementAddress = GetMatrixElementAddress(baseAddress, i, j, matrixSize); // Get element memory address
                     int value = ReadVirtualMemory(elementAddress);      // Read value from virtual memory
@@ -1110,7 +1110,6 @@ class VirtualMachine {
 
 int main() {
     VirtualMachine vm;
-    
     ofstream testFile("memory_program.asm");
         // Main program structure
         testFile << "START:\n";
@@ -1122,7 +1121,6 @@ int main() {
         testFile << "    CALL DisplayMenu\n";
         testFile << "    CALL ReadUserChoice\n";
         testFile << "    CALL ExecuteChoice\n";
-        testFile << "    CALL ContinueMessage\n";
         testFile << "    CALL ScreenClear\n";
         testFile << "    JMP MenuLoop\n";
         testFile << "\n";
